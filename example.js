@@ -359,7 +359,8 @@ async function handleCommand(interaction) {
 
     case "webhook-test": {
       const channel = await client.channels.fetch(interaction.channelId);
-      const webhook = await channel.createWebhook({ name: "discordbot.js demo" });
+      // Discord rejects webhook/bot names containing "clyde" or "discord" (case-insensitive) — avoid both.
+      const webhook = await channel.createWebhook({ name: "library demo" });
       await webhook.send("Hello from a webhook!");
       await webhook.delete("demo cleanup");
       await interaction.reply("Sent a message through a temporary webhook, then deleted it.");
