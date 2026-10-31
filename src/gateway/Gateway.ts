@@ -166,6 +166,7 @@ export class Gateway extends EventEmitter {
       return;
     }
 
+    this.emit("debug", `socket closed with code ${code}, reconnecting`);
     this.reconnect(!NON_RESUMABLE_CLOSE_CODES.has(code));
   }
 
