@@ -11,6 +11,9 @@ import { Guild, type APIGuild } from "../structures/Guild";
 import { Message, type APIMessage } from "../structures/Message";
 import { Interaction, type APIInteraction } from "../structures/Interaction";
 import { CommandInteraction } from "../structures/CommandInteraction";
+import { MessageComponentInteraction } from "../structures/MessageComponentInteraction";
+import { ModalSubmitInteraction } from "../structures/ModalSubmitInteraction";
+import { AutocompleteInteraction } from "../structures/AutocompleteInteraction";
 import { InteractionType } from "../util/Constants";
 import type { APIUser } from "../structures/User";
 
@@ -95,13 +98,25 @@ export class Client extends EventEmitter {
       }
       case "INTERACTION_CREATE": {
         const raw = data as APIInteraction;
-        const interaction =
-          raw.type === InteractionType.ApplicationCommand
-            ? new CommandInteraction(this, raw)
-            : new Interaction(this, raw);
+        const interaction = this.createInteraction(raw);
         this.emit("interactionCreate", interaction);
         break;
       }
+    }
+  }
+
+  private createInteraction(raw: APIInteraction): Interaction {
+    switch (raw.type) {
+      case InteractionType.ApplicationCommand:
+        return new CommandInteraction(this, raw);
+      case InteractionType.MessageComponent:
+        return new MessageComponentInteraction(this, raw);
+      case InteractionType.ModalSubmit:
+        return new ModalSubmitInteraction(this, raw);
+      case InteractionType.ApplicationCommandAutocomplete:
+        return new AutocompleteInteraction(this, raw);
+      default:
+        return new Interaction(this, raw);
     }
   }
 
