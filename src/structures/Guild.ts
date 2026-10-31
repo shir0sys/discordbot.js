@@ -4,6 +4,9 @@ import { RoleManager } from "../managers/RoleManager";
 import { GuildMemberManager } from "../managers/GuildMemberManager";
 import { GuildChannelManager } from "../managers/GuildChannelManager";
 import { GuildBanManager } from "../managers/GuildBanManager";
+import { GuildEmojiManager } from "../managers/GuildEmojiManager";
+import { GuildStickerManager } from "../managers/GuildStickerManager";
+import { GuildSoundboardManager } from "../managers/SoundboardManager";
 import { Role, type APIRole } from "./Role";
 import { Member, type APIMember } from "./Member";
 import { type APIChannel } from "./Channel";
@@ -12,6 +15,8 @@ import { createChannel } from "./ChannelFactory";
 import { GuildEmoji, type APIEmoji } from "./Emoji";
 import { Sticker, type APISticker } from "./Sticker";
 import { VoiceState, type APIVoiceState } from "./VoiceState";
+import { GuildOnboarding, type APIGuildOnboarding, type APIGuildWidgetSettings, type APIGuildPreview } from "./GuildOnboarding";
+import { GuildTemplateManager } from "../managers/GuildTemplateManager";
 import type { Client } from "../client/Client";
 
 export interface APIGuild {
@@ -42,8 +47,10 @@ export class Guild extends Base {
   public readonly channels: GuildChannelManager;
   public readonly members: GuildMemberManager;
   public readonly bans: GuildBanManager;
-  public readonly emojis = new Collection<string, GuildEmoji>();
-  public readonly stickers = new Collection<string, Sticker>();
+  public readonly emojis: GuildEmojiManager;
+  public readonly stickers: GuildStickerManager;
+  public readonly soundboardSounds: GuildSoundboardManager;
+  public readonly templates: GuildTemplateManager;
   public readonly voiceStates = new Collection<string, VoiceState>();
 
   constructor(client: Client, data: APIGuild) {
@@ -58,6 +65,10 @@ export class Guild extends Base {
     this.channels = new GuildChannelManager(client, this.id);
     this.members = new GuildMemberManager(client, this.id);
     this.bans = new GuildBanManager(client, this.id);
+    this.emojis = new GuildEmojiManager(client, this.id);
+    this.stickers = new GuildStickerManager(client, this.id);
+    this.soundboardSounds = new GuildSoundboardManager(client, this.id);
+    this.templates = new GuildTemplateManager(client, this.id);
 
     for (const role of data.roles) this.roles.set(role.id, new Role(client, this.id, role));
     for (const channel of data.channels ?? []) this.channels.set(channel.id, createChannel(client, channel));
@@ -103,6 +114,32 @@ export class Guild extends Base {
   public iconURL(): string | null {
     if (!this.icon) return null;
     return `https://cdn.discordapp.com/icons/${this.id}/${this.icon}.png`;
+  }
+
+  public async fetchOnboarding(): Promise<GuildOnboarding> {
+    const data = await this.client.rest.get<APIGuildOnboarding>(`/guilds/${this.id}/onboarding`);
+    return new GuildOnboarding(data);
+  }
+
+  public async editOnboarding(data: Partial<Pick<APIGuildOnboarding, "prompts" | "default_channel_ids" | "enabled" | "mode">>, reason?: string): Promise<GuildOnboarding> {
+    const payload = await this.client.rest.put<APIGuildOnboarding>(`/guilds/${this.id}/onboarding`, data, reason);
+    return new GuildOnboarding(payload);
+  }
+
+  public fetchWidgetSettings(): Promise<APIGuildWidgetSettings> {
+    return this.client.rest.get<APIGuildWidgetSettings>(`/guilds/${this.id}/widget`);
+  }
+
+  public editWidgetSettings(data: Partial<APIGuildWidgetSettings>, reason?: string): Promise<APIGuildWidgetSettings> {
+    return this.client.rest.patch<APIGuildWidgetSettings>(`/guilds/${this.id}/widget`, data, reason);
+  }
+
+  public fetchPreview(): Promise<APIGuildPreview> {
+    return this.client.rest.get<APIGuildPreview>(`/guilds/${this.id}/preview`);
+  }
+
+  public async fetchVanityURL(): Promise<{ code: string | null; uses: number }> {
+    return this.client.rest.get(`/guilds/${this.id}/vanity-url`);
   }
 
   public async fetchAuditLogs(options: { limit?: number; user_id?: string; action_type?: number } = {}): Promise<
