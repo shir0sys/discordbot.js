@@ -12,6 +12,8 @@ export interface GatewayOptions {
   token: string;
   intents: number;
   largeThreshold?: number;
+  shardId?: number;
+  shardCount?: number;
 }
 
 const NON_RESUMABLE_CLOSE_CODES = new Set<number>([GatewayCloseCodes.InvalidSeq, GatewayCloseCodes.SessionTimedOut]);
@@ -116,6 +118,7 @@ export class Gateway extends EventEmitter {
       token: this.options.token,
       intents: this.options.intents,
       large_threshold: this.options.largeThreshold ?? 50,
+      shard: this.options.shardCount ? [this.options.shardId ?? 0, this.options.shardCount] : undefined,
       properties: {
         os: process.platform,
         browser: "discordbot.js",
