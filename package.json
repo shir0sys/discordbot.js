@@ -10,7 +10,8 @@
   "scripts": {
     "build": "tsc -p .",
     "watch": "tsc -p . --watch",
-    "example": "node example.js"
+    "example": "node example.js",
+    "test": "tsc -p . && node --test test/*.test.js"
   },
   "license": "MIT",
   "devDependencies": {
