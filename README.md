@@ -18,6 +18,8 @@ See [examples/ticket-bot.js](./examples/ticket-bot.js) for a complete, restart-s
 
 See [examples/voice-bot.js](./examples/voice-bot.js) for joining a voice channel and playing audio (`/play`, `/stop`) — needs `ffmpeg` installed separately as a system binary to transcode input into raw PCM.
 
+See [examples/music-bot.js](./examples/music-bot.js) for a YouTube music bot (`/joinmyvoc`, `/playmusic`, `/pausemusic`, `/stopmusic`) — needs `ffmpeg` and [`yt-dlp`](https://github.com/yt-dlp/yt-dlp) installed separately as system binaries.
+
 ## Testing
 
 ```bash

@@ -36,4 +36,4 @@ jobs:
         run: node --test test/*.test.js
 
       - name: Check example scripts syntax
-        run: node --check example.js && node --check examples/ticket-bot.js && node --check examples/voice-bot.js
+        run: node --check example.js && node --check examples/ticket-bot.js && node --check examples/voice-bot.js && node --check examples/music-bot.js
