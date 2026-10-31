@@ -75,10 +75,29 @@ const commands = [
     .addStringOption("reason", "Why"),
 
   new SlashCommandBuilder()
+    .setName("unban")
+    .setDescription("Lifts a ban")
+    .addStringOption("user_id", "The banned user's id (they're not a member anymore, so no @mention picker)", {
+      required: true,
+    }),
+
+  new SlashCommandBuilder()
     .setName("timeout")
     .setDescription("Times out a member")
     .addUserOption("target", "Who", { required: true })
-    .addIntegerOption("minutes", "Duration in minutes", { required: true }),
+    // Discord caps timeouts at 28 days (40320 minutes) — enforced here so
+    // Discord's own UI rejects an out-of-range value before it ever reaches us,
+    // instead of a 400 on communication_disabled_until after the fact.
+    .addIntegerOption("minutes", "Duration in minutes (max 40320 = 28 days)", {
+      required: true,
+      minValue: 1,
+      maxValue: 40320,
+    }),
+
+  new SlashCommandBuilder()
+    .setName("untimeout")
+    .setDescription("Removes an active timeout early")
+    .addUserOption("target", "Who", { required: true }),
 
   new SlashCommandBuilder()
     .setName("permcheck")
@@ -285,12 +304,28 @@ async function handleCommand(interaction) {
       return;
     }
 
+    case "unban": {
+      if (!interaction.guildId) return;
+      const guild = await client.guilds.fetch(interaction.guildId);
+      await guild.bans.remove(interaction.getOption("user_id"), "Requested via /unban");
+      await interaction.reply(`Unbanned <@${interaction.getOption("user_id")}>.`);
+      return;
+    }
+
     case "timeout": {
       if (!interaction.guildId) return;
       const guild = await client.guilds.fetch(interaction.guildId);
       const minutes = interaction.getOption("minutes");
       await guild.members.timeout(interaction.getOption("target"), minutes * 60 * 1000, "Requested via /timeout");
       await interaction.reply(`Timed out <@${interaction.getOption("target")}> for ${minutes} minute(s).`);
+      return;
+    }
+
+    case "untimeout": {
+      if (!interaction.guildId) return;
+      const guild = await client.guilds.fetch(interaction.guildId);
+      await guild.members.timeout(interaction.getOption("target"), null, "Requested via /untimeout");
+      await interaction.reply(`Removed the timeout on <@${interaction.getOption("target")}>.`);
       return;
     }
 
