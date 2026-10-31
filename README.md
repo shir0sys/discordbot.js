@@ -1,5 +1,7 @@
 # discordbot.js
 
+[![CI](https://github.com/shir0sys/discordbot.js/actions/workflows/ci.yml/badge.svg)](https://github.com/shir0sys/discordbot.js/actions/workflows/ci.yml)
+
 Zero-dependency Discord API v10 wrapper for Node.js (>=22), built on native `fetch`, `WebSocket`, and `EventEmitter` only.
 
 ## Usage
