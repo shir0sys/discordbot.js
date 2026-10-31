@@ -45,7 +45,10 @@ export class Webhook extends Base {
 
 /** Standalone webhook execution client, authenticated purely via the webhook id/token (no bot token required). */
 export class WebhookClient {
-  constructor(private readonly id: string, private readonly token: string) {}
+  constructor(
+    private readonly id: string,
+    private readonly token: string,
+  ) {}
 
   public async send(payload: MessagePayload): Promise<void> {
     const { body, files } = normalizeMessagePayload(payload);

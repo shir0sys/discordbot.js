@@ -34,7 +34,10 @@ export class GuildScheduledEvent extends Base {
     this.entityType = data.entity_type;
   }
 
-  public async edit(data: Partial<{ name: string; description: string; status: number }>, reason?: string): Promise<void> {
+  public async edit(
+    data: Partial<{ name: string; description: string; status: number }>,
+    reason?: string,
+  ): Promise<void> {
     await this.client.rest.patch(`/guilds/${this.guildId}/scheduled-events/${this.id}`, data, reason);
   }
 

@@ -31,7 +31,10 @@ export class ShardingManager extends EventEmitter {
   private nextEvalId = 0;
   private totalShards = 0;
 
-  constructor(private readonly file: string, private readonly options: ShardingManagerOptions) {
+  constructor(
+    private readonly file: string,
+    private readonly options: ShardingManagerOptions,
+  ) {
     super();
   }
 

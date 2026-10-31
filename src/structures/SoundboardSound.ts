@@ -31,7 +31,10 @@ export class SoundboardSound extends Base {
     this.available = data.available;
   }
 
-  public async edit(data: Partial<{ name: string; volume: number; emoji_id: string | null; emoji_name: string | null }>, reason?: string): Promise<void> {
+  public async edit(
+    data: Partial<{ name: string; volume: number; emoji_id: string | null; emoji_name: string | null }>,
+    reason?: string,
+  ): Promise<void> {
     if (!this.guildId) throw new Error("Cannot edit a default soundboard sound");
     await this.client.rest.patch(`/guilds/${this.guildId}/soundboard-sounds/${this.id}`, data, reason);
   }

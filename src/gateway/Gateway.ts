@@ -78,8 +78,8 @@ export class Gateway extends EventEmitter {
   }): void {
     this.send(GatewayOpcodes.RequestGuildMembers, {
       guild_id: options.guildId,
-      query: options.userIds ? undefined : options.query ?? "",
-      limit: options.userIds ? undefined : options.limit ?? 0,
+      query: options.userIds ? undefined : (options.query ?? ""),
+      limit: options.userIds ? undefined : (options.limit ?? 0),
       presences: options.presences,
       user_ids: options.userIds,
       nonce: options.nonce,

@@ -11,7 +11,10 @@ export class StageChannel extends VoiceChannel {
     this.topic = data.topic ?? null;
   }
 
-  public async createStageInstance(data: { topic: string; privacy_level?: number }, reason?: string): Promise<StageInstance> {
+  public async createStageInstance(
+    data: { topic: string; privacy_level?: number },
+    reason?: string,
+  ): Promise<StageInstance> {
     const payload = await this.client.rest.post<APIStageInstance>(
       "/stage-instances",
       { channel_id: this.id, ...data },

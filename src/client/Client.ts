@@ -55,6 +55,42 @@ export interface GuildMembersChunkData {
   nonce: string | null;
 }
 
+/** MESSAGE_UPDATE only carries the fields that actually changed — everything but id/channelId may be absent. */
+export interface PartialMessageUpdate {
+  id: string;
+  channelId: string;
+  guildId: string | null;
+  content?: string;
+  editedTimestamp?: number;
+}
+
+export interface MessageReactionEventData {
+  userId: string;
+  channelId: string;
+  messageId: string;
+  guildId: string | null;
+  emoji: { id: string | null; name: string | null; animated: boolean };
+}
+
+export interface MessageReactionRemoveAllData {
+  channelId: string;
+  messageId: string;
+  guildId: string | null;
+}
+
+export interface MessageReactionRemoveEmojiData {
+  channelId: string;
+  messageId: string;
+  guildId: string | null;
+  emoji: { id: string | null; name: string | null };
+}
+
+export interface ChannelPinsUpdateData {
+  channelId: string;
+  guildId: string | null;
+  lastPinTimestamp: number | null;
+}
+
 export interface ClientOptions {
   intents: IntentResolvable;
   largeThreshold?: number;
@@ -74,13 +110,13 @@ type ClientEvents = {
   debug: [string];
   error: [import("../util/Errors").GatewayError];
   messageCreate: [Message];
-  messageUpdate: [Record<string, unknown>];
+  messageUpdate: [PartialMessageUpdate];
   messageDelete: [{ id: string; channelId: string; guildId: string | null }];
   messageDeleteBulk: [{ ids: string[]; channelId: string; guildId: string | null }];
-  messageReactionAdd: [Record<string, unknown>];
-  messageReactionRemove: [Record<string, unknown>];
-  messageReactionRemoveAll: [Record<string, unknown>];
-  messageReactionRemoveEmoji: [Record<string, unknown>];
+  messageReactionAdd: [MessageReactionEventData];
+  messageReactionRemove: [MessageReactionEventData];
+  messageReactionRemoveAll: [MessageReactionRemoveAllData];
+  messageReactionRemoveEmoji: [MessageReactionRemoveEmojiData];
   messagePollVoteAdd: [PollVoteData];
   messagePollVoteRemove: [PollVoteData];
   guildCreate: [Guild];
@@ -98,7 +134,7 @@ type ClientEvents = {
   channelCreate: [import("../structures/Channel").Channel];
   channelUpdate: [import("../structures/Channel").Channel];
   channelDelete: [import("../structures/Channel").Channel];
-  channelPinsUpdate: [Record<string, unknown>];
+  channelPinsUpdate: [ChannelPinsUpdateData];
   threadCreate: [import("../structures/ThreadChannel").ThreadChannel];
   threadUpdate: [import("../structures/ThreadChannel").ThreadChannel];
   threadDelete: [{ id: string; guildId: string }];
@@ -137,6 +173,8 @@ export class Client extends EventEmitter {
   // token up front and ClientOptions alone doesn't carry one.
   private _rest: REST | null = null;
   private readonly _gateways: Gateway[] = [];
+  private readonly readyShards = new Set<number>();
+  private expectedShardCount = 1;
 
   public user: ClientUser | null = null;
   public applicationId: string | null = null;
@@ -185,11 +223,23 @@ export class Client extends EventEmitter {
 
     const gatewayInfo = await this._rest.get<APIGatewayBotInfo>("/gateway/bot");
     const shardCount = this.options.shardCount === "auto" ? gatewayInfo.shards : this.options.shardCount;
+    const maxConcurrency = gatewayInfo.session_start_limit.max_concurrency || 1;
+    this.expectedShardCount = shardCount;
 
-    for (let shardId = 0; shardId < shardCount; shardId++) {
-      this.spawnShard(token, shardId, shardCount);
-      // Stays well under the 1-IDENTIFY-per-5s limit even without using max_concurrency buckets.
-      if (shardId < shardCount - 1) await delay(5500);
+    // Shards are identified in "rate limit key" buckets of shardId % max_concurrency.
+    // Different buckets may IDENTIFY concurrently; within a bucket, one at a time,
+    // spaced out below the gateway's 1-per-5s-per-bucket limit.
+    const bucketCount = Math.min(maxConcurrency, shardCount);
+    let round = 0;
+    for (let offset = 0; offset * bucketCount < shardCount; offset++) {
+      const shardIds: number[] = [];
+      for (let bucket = 0; bucket < bucketCount; bucket++) {
+        const shardId = offset * bucketCount + bucket;
+        if (shardId < shardCount) shardIds.push(shardId);
+      }
+      for (const shardId of shardIds) this.spawnShard(token, shardId, shardCount);
+      round++;
+      if (round * bucketCount < shardCount) await delay(5500);
     }
   }
 
@@ -201,21 +251,22 @@ export class Client extends EventEmitter {
       shardId: shardCount ? shardId : undefined,
       shardCount: shardCount || undefined,
     });
-    gateway.on("dispatch", (event, data) => this.onDispatch(event, data));
+    gateway.on("dispatch", (event, data) => this.onDispatch(event, data, shardId));
     gateway.on("debug", (message) => this.emit("debug", `[shard ${shardId}] ${message}`));
     gateway.on("error", (error) => this.emit("error", error));
     gateway.connect();
     this._gateways[shardId] = gateway;
   }
 
-  private onDispatch(event: string, data: unknown): void {
+  private onDispatch(event: string, data: unknown, shardId = 0): void {
     const d = data as Record<string, any>;
 
     switch (event) {
       case "READY": {
         this.user = new ClientUser(this, d.user as APIUser);
         this.applicationId = d.application.id;
-        this.emit("ready");
+        this.readyShards.add(shardId);
+        if (this.readyShards.size >= this.expectedShardCount) this.emit("ready");
         break;
       }
       case "RESUMED":
@@ -227,7 +278,13 @@ export class Client extends EventEmitter {
         this.emit("messageCreate", new Message(this, d as APIMessage));
         break;
       case "MESSAGE_UPDATE":
-        this.emit("messageUpdate", d);
+        this.emit("messageUpdate", {
+          id: d.id,
+          channelId: d.channel_id,
+          guildId: d.guild_id ?? null,
+          content: d.content,
+          editedTimestamp: d.edited_timestamp ? Date.parse(d.edited_timestamp) : undefined,
+        });
         break;
       case "MESSAGE_DELETE":
         this.emit("messageDelete", { id: d.id, channelId: d.channel_id, guildId: d.guild_id ?? null });
@@ -236,16 +293,37 @@ export class Client extends EventEmitter {
         this.emit("messageDeleteBulk", { ids: d.ids, channelId: d.channel_id, guildId: d.guild_id ?? null });
         break;
       case "MESSAGE_REACTION_ADD":
-        this.emit("messageReactionAdd", d);
+        this.emit("messageReactionAdd", {
+          userId: d.user_id,
+          channelId: d.channel_id,
+          messageId: d.message_id,
+          guildId: d.guild_id ?? null,
+          emoji: { id: d.emoji?.id ?? null, name: d.emoji?.name ?? null, animated: d.emoji?.animated ?? false },
+        });
         break;
       case "MESSAGE_REACTION_REMOVE":
-        this.emit("messageReactionRemove", d);
+        this.emit("messageReactionRemove", {
+          userId: d.user_id,
+          channelId: d.channel_id,
+          messageId: d.message_id,
+          guildId: d.guild_id ?? null,
+          emoji: { id: d.emoji?.id ?? null, name: d.emoji?.name ?? null, animated: d.emoji?.animated ?? false },
+        });
         break;
       case "MESSAGE_REACTION_REMOVE_ALL":
-        this.emit("messageReactionRemoveAll", d);
+        this.emit("messageReactionRemoveAll", {
+          channelId: d.channel_id,
+          messageId: d.message_id,
+          guildId: d.guild_id ?? null,
+        });
         break;
       case "MESSAGE_REACTION_REMOVE_EMOJI":
-        this.emit("messageReactionRemoveEmoji", d);
+        this.emit("messageReactionRemoveEmoji", {
+          channelId: d.channel_id,
+          messageId: d.message_id,
+          guildId: d.guild_id ?? null,
+          emoji: { id: d.emoji?.id ?? null, name: d.emoji?.name ?? null },
+        });
         break;
       case "MESSAGE_POLL_VOTE_ADD":
         this.emit("messagePollVoteAdd", toPollVoteData(d));
@@ -283,13 +361,17 @@ export class Client extends EventEmitter {
       // Members
       case "GUILD_MEMBER_ADD": {
         const guild = this.guilds.cache.get(d.guild_id);
-        const member = guild ? guild._patchMember(d.user.id, d as APIMember) : new Member(this, d.guild_id, d as APIMember);
+        const member = guild
+          ? guild._patchMember(d.user.id, d as APIMember)
+          : new Member(this, d.guild_id, d as APIMember);
         this.emit("guildMemberAdd", member);
         break;
       }
       case "GUILD_MEMBER_UPDATE": {
         const guild = this.guilds.cache.get(d.guild_id);
-        const member = guild ? guild._patchMember(d.user.id, d as APIMember) : new Member(this, d.guild_id, d as APIMember);
+        const member = guild
+          ? guild._patchMember(d.user.id, d as APIMember)
+          : new Member(this, d.guild_id, d as APIMember);
         this.emit("guildMemberUpdate", member);
         break;
       }
@@ -362,7 +444,11 @@ export class Client extends EventEmitter {
         break;
       }
       case "CHANNEL_PINS_UPDATE":
-        this.emit("channelPinsUpdate", d);
+        this.emit("channelPinsUpdate", {
+          channelId: d.channel_id,
+          guildId: d.guild_id ?? null,
+          lastPinTimestamp: d.last_pin_timestamp ? Date.parse(d.last_pin_timestamp) : null,
+        });
         break;
 
       // Threads

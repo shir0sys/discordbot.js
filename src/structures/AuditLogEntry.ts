@@ -47,7 +47,9 @@ export class AuditLogEntry {
     this.targetId = data.target_id;
     this.actionType = data.action_type;
     this.reason = data.reason ?? null;
-    this.changes = new Map((data.changes ?? []).map((change) => [change.key, { old: change.old_value, new: change.new_value }]));
+    this.changes = new Map(
+      (data.changes ?? []).map((change) => [change.key, { old: change.old_value, new: change.new_value }]),
+    );
     this.options = data.options ?? null;
   }
 
