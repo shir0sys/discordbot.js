@@ -276,6 +276,12 @@ export class Client extends EventEmitter {
       endpoint: server.endpoint,
     });
     this.voiceConnections.set(guildId, connection);
+    connection.on("debug", (message) => this.emit("debug", `[voice] ${message}`));
+    // Attaching this immediately (rather than leaving 'error' unlistened)
+    // also prevents Node's default EventEmitter behavior of throwing on an
+    // unhandled 'error' event if something goes wrong before the caller
+    // gets a reference to the connection to listen on it themselves.
+    connection.on("error", (error) => this.emit("debug", `[voice] error: ${error.message}`));
 
     try {
       await connection.waitUntilReady(timeout);

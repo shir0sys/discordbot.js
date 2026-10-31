@@ -60,11 +60,19 @@ export class VoiceConnection extends EventEmitter {
   private async onVoiceReady(data: { ssrc: number; ip: string; port: number }): Promise<void> {
     this.ssrc = data.ssrc;
     this.udp = new VoiceUDP(data.ssrc, data.ip, data.port);
+    this.emit("debug", `voice ready (ssrc=${data.ssrc}, ${data.ip}:${data.port}), starting UDP IP discovery`);
     try {
       const discovered = await this.udp.discoverIP();
+      this.emit("debug", `UDP IP discovery resolved to ${discovered.address}:${discovered.port}`);
       this.gateway.sendSelectProtocol(discovered.address, discovered.port);
     } catch (error) {
-      this.emit("error", error as Error);
+      // Most commonly a firewall/NAT blocking outbound UDP to the voice
+      // region server — fail fast with a clear reason instead of leaving
+      // waitUntilReady() to time out with no explanation. Reported via
+      // 'debug' rather than 'error' so a connection that nobody attached
+      // an error listener to doesn't crash the process on top of failing.
+      this.emit("debug", `UDP IP discovery failed: ${(error as Error).message}`);
+      this.destroy();
     }
   }
 
@@ -72,6 +80,7 @@ export class VoiceConnection extends EventEmitter {
     this.udp?.setSecretKey(data.secretKey);
     if (this.player) this.player.attach(this.udp!);
     this.status = VoiceConnectionStatus.Ready;
+    this.emit("debug", "session description received, connection ready");
     this.emit("stateChange", this.status);
   }
 

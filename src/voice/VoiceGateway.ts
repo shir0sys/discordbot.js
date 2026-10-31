@@ -1,6 +1,21 @@
 import { EventEmitter } from "node:events";
 import { VoiceOpcodes, VOICE_GATEWAY_VERSION, ENCRYPTION_MODE } from "./VoiceConstants";
 
+const VOICE_CLOSE_CODE_REASONS: Record<number, string> = {
+  4001: "unknown opcode",
+  4002: "failed to decode payload",
+  4003: "not identified",
+  4004: "authentication failed — bad token/session",
+  4005: "already identified",
+  4006: "session no longer valid",
+  4009: "session timed out",
+  4011: "server not found",
+  4012: "unknown protocol",
+  4014: "disconnected (kicked/moved from the channel)",
+  4015: "voice server crashed",
+  4016: "unknown encryption mode",
+};
+
 export interface VoiceGatewayOptions {
   endpoint: string;
   guildId: string;
@@ -73,6 +88,7 @@ export class VoiceGateway extends EventEmitter {
   }
 
   public sendSelectProtocol(address: string, port: number): void {
+    this.emit("debug", `sending SELECT_PROTOCOL (${address}:${port}, mode=${ENCRYPTION_MODE})`);
     this.send(VoiceOpcodes.SelectProtocol, {
       protocol: "udp",
       data: { address, port, mode: ENCRYPTION_MODE },
@@ -93,9 +109,11 @@ export class VoiceGateway extends EventEmitter {
         this.identify();
         break;
       case VoiceOpcodes.Ready:
+        this.emit("debug", `voice READY, supported modes: ${payload.d.modes?.join(", ")}`);
         this.emit("ready", { ssrc: payload.d.ssrc, ip: payload.d.ip, port: payload.d.port, modes: payload.d.modes });
         break;
       case VoiceOpcodes.SessionDescription:
+        this.emit("debug", `voice SESSION_DESCRIPTION received (mode=${payload.d.mode})`);
         this.emit("sessionDescription", { mode: payload.d.mode, secretKey: Uint8Array.from(payload.d.secret_key) });
         break;
       case VoiceOpcodes.HeartbeatAck:
@@ -108,6 +126,7 @@ export class VoiceGateway extends EventEmitter {
   }
 
   private identify(): void {
+    this.emit("debug", "sending voice IDENTIFY");
     this.send(VoiceOpcodes.Identify, {
       server_id: this.options.guildId,
       user_id: this.options.userId,
@@ -138,6 +157,7 @@ export class VoiceGateway extends EventEmitter {
 
   private onClose(code: number): void {
     this.clearHeartbeat();
+    this.emit("debug", `voice socket closed: ${code} (${VOICE_CLOSE_CODE_REASONS[code] ?? "unknown"})`);
     this.emit("close", code);
     if (this.destroyed) return;
     // 4006 (session no longer valid) and 4014 (disconnected by Discord, e.g.
