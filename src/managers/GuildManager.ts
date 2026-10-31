@@ -1,16 +1,21 @@
-import { Collection } from "./Collection";
+import { CachedManager } from "./CachedManager";
 import { Guild, type APIGuild } from "../structures/Guild";
 import type { Client } from "../client/Client";
 
-export class GuildManager {
-  public readonly cache = new Collection<string, Guild>();
+export class GuildManager extends CachedManager<string, Guild> {
+  constructor(client: Client) {
+    super(client);
+  }
 
-  constructor(private readonly client: Client) {}
+  public fetch(id: string): Promise<Guild> {
+    return this.fetchAndCache<APIGuild>(id, `/guilds/${id}`, (data) => new Guild(this.client, data));
+  }
 
-  public async fetch(id: string): Promise<Guild> {
-    const data = await this.client.rest.get<APIGuild>(`/guilds/${id}`);
-    const guild = new Guild(this.client, data);
-    this.cache.set(guild.id, guild);
+  /** Bots in fewer than 10 guilds can create a new one via the API; above that, Discord rejects this with 403. */
+  public async create(data: { name: string; icon?: string }): Promise<Guild> {
+    const payload = await this.client.rest.post<APIGuild>("/guilds", data);
+    const guild = new Guild(this.client, payload);
+    this.set(guild.id, guild);
     return guild;
   }
 }

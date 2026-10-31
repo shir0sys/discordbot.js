@@ -1,18 +1,15 @@
-import { Collection } from "./Collection";
+import { CachedManager } from "./CachedManager";
 import { User, type APIUser } from "../structures/User";
 import type { Client } from "../client/Client";
 
-export class UserManager {
-  public readonly cache = new Collection<string, User>(null, 10000);
-
-  constructor(private readonly client: Client) {}
+export class UserManager extends CachedManager<string, User> {
+  constructor(client: Client) {
+    super(client, 10000);
+  }
 
   public async fetch(id: string): Promise<User> {
-    const cached = this.cache.get(id);
+    const cached = this.get(id);
     if (cached) return cached;
-    const data = await this.client.rest.get<APIUser>(`/users/${id}`);
-    const user = new User(this.client, data);
-    this.cache.set(user.id, user);
-    return user;
+    return this.fetchAndCache<APIUser>(id, `/users/${id}`, (data) => new User(this.client, data));
   }
 }

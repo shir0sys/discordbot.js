@@ -3,8 +3,14 @@ import { Message, type APIMessage } from "../structures/Message";
 import type { Client } from "../client/Client";
 
 export class MessageManager extends Collection<string, Message> {
-  constructor(private readonly client: Client, private readonly channelId: string) {
+  constructor(
+    private readonly client: Client,
+    private readonly channelId: string,
+  ) {
     super(null, 200);
+    // Cached messages older than an hour are swept even if the 200-entry cap isn't hit —
+    // most bots never look back that far, and it keeps long-lived channels from pinning memory.
+    this.startSweeping({ maxAgeMs: 60 * 60 * 1000 });
   }
 
   public async fetch(id: string): Promise<Message> {

@@ -1,19 +1,16 @@
-import { Collection } from "./Collection";
+import { CachedManager } from "./CachedManager";
 import { Channel, type APIChannel } from "../structures/Channel";
 import { createChannel } from "../structures/ChannelFactory";
 import type { Client } from "../client/Client";
 
-export class ChannelManager {
-  public readonly cache = new Collection<string, Channel>(null, 1000);
-
-  constructor(private readonly client: Client) {}
+export class ChannelManager extends CachedManager<string, Channel> {
+  constructor(client: Client) {
+    super(client, 1000);
+  }
 
   public async fetch(id: string): Promise<Channel> {
-    const cached = this.cache.get(id);
+    const cached = this.get(id);
     if (cached) return cached;
-    const data = await this.client.rest.get<APIChannel>(`/channels/${id}`);
-    const channel = createChannel(this.client, data);
-    this.cache.set(channel.id, channel);
-    return channel;
+    return this.fetchAndCache<APIChannel>(id, `/channels/${id}`, (data) => createChannel(this.client, data));
   }
 }
