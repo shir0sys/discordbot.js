@@ -93,7 +93,13 @@ export class AudioPlayer extends EventEmitter {
       return;
     }
 
-    this.udp?.sendOpusPacket(frame);
+    try {
+      this.udp?.sendOpusPacket(frame);
+    } catch (error) {
+      this.emit("error", error as Error);
+      this.stop();
+      return;
+    }
     this.nextFrameTime += 20;
     this.scheduleNextTick();
   }

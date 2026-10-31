@@ -79,6 +79,34 @@ export class VoiceConnection extends EventEmitter {
     return this.status;
   }
 
+  /** Resolves once the voice gateway handshake and UDP session description have both completed — audio sent before that point is silently dropped (no secret key to encrypt it yet). */
+  public waitUntilReady(timeoutMs = 10000): Promise<void> {
+    if (this.status === VoiceConnectionStatus.Ready) return Promise.resolve();
+    if (this.status === VoiceConnectionStatus.Destroyed) {
+      return Promise.reject(new Error("Voice connection was destroyed before it became ready"));
+    }
+
+    return new Promise((resolve, reject) => {
+      const onState = (state: VoiceConnectionStatus) => {
+        if (state === VoiceConnectionStatus.Ready) {
+          clearTimeout(timer);
+          this.off("stateChange", onState);
+          resolve();
+        } else if (state === VoiceConnectionStatus.Destroyed) {
+          clearTimeout(timer);
+          this.off("stateChange", onState);
+          reject(new Error("Voice connection was destroyed before it became ready"));
+        }
+      };
+      const timer = setTimeout(() => {
+        this.off("stateChange", onState);
+        reject(new Error("Timed out waiting for the voice connection to become ready"));
+      }, timeoutMs);
+      timer.unref?.();
+      this.on("stateChange", onState);
+    });
+  }
+
   /** Attaches a player to this connection's UDP transport and starts toggling the SPEAKING flag with its playback state. */
   public subscribe(player: AudioPlayer): void {
     this.player = player;

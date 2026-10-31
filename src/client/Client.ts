@@ -276,6 +276,15 @@ export class Client extends EventEmitter {
       endpoint: server.endpoint,
     });
     this.voiceConnections.set(guildId, connection);
+
+    try {
+      await connection.waitUntilReady(timeout);
+    } catch (error) {
+      connection.destroy();
+      this.voiceConnections.delete(guildId);
+      throw error;
+    }
+
     return connection;
   }
 
