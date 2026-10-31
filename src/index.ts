@@ -1,14 +1,30 @@
 export { Client, type ClientOptions } from "./client/Client";
-export { REST, DiscordAPIError, type RESTOptions } from "./rest/REST";
+export { REST, DiscordAPIError, type RESTOptions, type RESTFile } from "./rest/REST";
+export { Bucket } from "./rest/Bucket";
 export { Gateway, type GatewayOptions } from "./gateway/Gateway";
 export { IntentsBitField } from "./util/Intents";
 export * from "./util/Constants";
+
+export { BitField, type BitFieldResolvable } from "./util/BitField";
+export { PermissionsBitField, PermissionFlags, computeChannelPermissions, type APIPermissionOverwrite } from "./util/Permissions";
+export { UserFlagsBitField, UserFlagValues } from "./util/UserFlags";
+export * as Formatters from "./util/Formatters";
+export * as SnowflakeUtil from "./util/SnowflakeUtil";
+export { resolveColor, NamedColors, type ColorResolvable } from "./util/Colors";
+export { HTTPError, RateLimitError, GatewayError } from "./util/Errors";
+export { Collector, type CollectorOptions, type CollectorEndReason } from "./util/Collector";
 
 export { Collection } from "./managers/Collection";
 export { GuildManager } from "./managers/GuildManager";
 export { ChannelManager } from "./managers/ChannelManager";
 export { UserManager } from "./managers/UserManager";
-export { ApplicationCommandManager, type ApplicationCommandData } from "./managers/ApplicationCommandManager";
+export { RoleManager } from "./managers/RoleManager";
+export { GuildMemberManager } from "./managers/GuildMemberManager";
+export { GuildChannelManager } from "./managers/GuildChannelManager";
+export { GuildBanManager } from "./managers/GuildBanManager";
+export { MessageManager } from "./managers/MessageManager";
+export { ThreadManager } from "./managers/ThreadManager";
+export { ApplicationCommandManager, type ApplicationCommandData, type CommandInput } from "./managers/ApplicationCommandManager";
 
 export { Base } from "./structures/Base";
 export { User, type APIUser } from "./structures/User";
@@ -17,15 +33,32 @@ export { Guild, type APIGuild } from "./structures/Guild";
 export { Role, type APIRole } from "./structures/Role";
 export { Member, type APIMember } from "./structures/Member";
 export { Channel, type APIChannel } from "./structures/Channel";
+export { createChannel } from "./structures/ChannelFactory";
 export { TextChannel } from "./structures/TextChannel";
 export { VoiceChannel } from "./structures/VoiceChannel";
 export { DMChannel } from "./structures/DMChannel";
-export { Message, type APIMessage, type MessagePayload, type MessageCreateData } from "./structures/Message";
-export { Interaction, type APIInteraction } from "./structures/Interaction";
+export { ThreadChannel, type APIThreadChannel, type APIThreadMetadata } from "./structures/ThreadChannel";
+export { Message, type APIMessage, type APIAttachment, type MessagePayload, type MessageCreateData, type ResolvedPayload } from "./structures/Message";
+export { MessageReaction, type APIMessageReaction } from "./structures/MessageReaction";
+export { Emoji, GuildEmoji, type APIEmoji as APIEmojiData } from "./structures/Emoji";
+export { Sticker, type APISticker } from "./structures/Sticker";
+export { Webhook, WebhookClient, type APIWebhook } from "./structures/Webhook";
+export { VoiceState, type APIVoiceState } from "./structures/VoiceState";
+export { StageInstance, type APIStageInstance } from "./structures/StageInstance";
+export { GuildScheduledEvent, type APIGuildScheduledEvent } from "./structures/GuildScheduledEvent";
+export { AutoModerationRule, type APIAutoModerationRule } from "./structures/AutoModerationRule";
+export { AuditLogEntry, type APIAuditLogEntry, type APIAuditLogChange } from "./structures/AuditLogEntry";
+
+export { Interaction, type APIInteraction, type APIInteractionData, type APIInteractionOption } from "./structures/Interaction";
 export { CommandInteraction } from "./structures/CommandInteraction";
+export { ContextMenuCommandInteraction } from "./structures/ContextMenuCommandInteraction";
 export { MessageComponentInteraction } from "./structures/MessageComponentInteraction";
 export { ModalSubmitInteraction } from "./structures/ModalSubmitInteraction";
 export { AutocompleteInteraction } from "./structures/AutocompleteInteraction";
+
+export { MessageCollector } from "./structures/MessageCollector";
+export { ReactionCollector, type CollectedReaction } from "./structures/ReactionCollector";
+export { InteractionCollector, type InteractionCollectorOptions } from "./structures/InteractionCollector";
 
 export { EmbedBuilder, type APIEmbed, type APIEmbedField } from "./builders/EmbedBuilder";
 export {
@@ -50,3 +83,6 @@ export {
 } from "./builders/ComponentsV2";
 export { ModalBuilder, TextInputBuilder } from "./builders/Modal";
 export { SlashCommandBuilder, SlashCommandSubcommandBuilder } from "./builders/SlashCommandBuilder";
+export { ContextMenuCommandBuilder } from "./builders/ContextMenuCommandBuilder";
+export { AttachmentBuilder } from "./builders/AttachmentBuilder";
+export { PollBuilder, type PollAnswerData } from "./builders/PollBuilder";
