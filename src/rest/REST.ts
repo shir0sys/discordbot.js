@@ -42,6 +42,13 @@ export class REST {
   private readonly routeToBucket = new Map<string, string>();
   private globalResetAt = 0;
 
+  // Discord Cloudflare-bans IPs that rack up 10,000 invalid (401/403/429)
+  // responses within 10 minutes. Tracked as a rolling window of timestamps;
+  // once close to the limit, requests self-throttle instead of risking a ban.
+  private readonly invalidRequestTimestamps: number[] = [];
+  private static readonly INVALID_REQUEST_WINDOW_MS = 10 * 60 * 1000;
+  private static readonly INVALID_REQUEST_SAFETY_LIMIT = 9000;
+
   constructor(options: RESTOptions) {
     this.token = options.token;
     this.authPrefix = options.authPrefix ?? "Bot";
@@ -74,6 +81,7 @@ export class REST {
     if (this.globalResetAt > Date.now()) {
       await delay(this.globalResetAt - Date.now());
     }
+    await this.throttleIfNearInvalidRequestLimit();
 
     const url = this.buildUrl(options);
     const headers: Record<string, string> = {
@@ -90,7 +98,8 @@ export class REST {
         form.append("payload_json", JSON.stringify(options.body));
       }
       options.files.forEach((file, index) => {
-        const blob = file.data instanceof Blob ? file.data : new Blob([file.data as BlobPart], { type: file.contentType });
+        const blob =
+          file.data instanceof Blob ? file.data : new Blob([file.data as BlobPart], { type: file.contentType });
         form.append(`files[${index}]`, blob, file.name);
       });
       body = form;
@@ -100,6 +109,10 @@ export class REST {
     }
 
     const response = await fetch(url, { method: options.method, headers, body });
+
+    if (response.status === 401 || response.status === 403 || response.status === 429) {
+      this.invalidRequestTimestamps.push(Date.now());
+    }
 
     const bucketHash = response.headers.get("x-ratelimit-bucket");
     if (bucketHash) this.routeToBucket.set(routeKey, bucketHash);
@@ -138,6 +151,19 @@ export class REST {
     }
 
     return data as T;
+  }
+
+  /** Prunes the invalid-request window and, if it's nearly full, waits out the oldest entry rather than risk a Cloudflare ban. */
+  private async throttleIfNearInvalidRequestLimit(): Promise<void> {
+    const cutoff = Date.now() - REST.INVALID_REQUEST_WINDOW_MS;
+    while (this.invalidRequestTimestamps.length && this.invalidRequestTimestamps[0] < cutoff) {
+      this.invalidRequestTimestamps.shift();
+    }
+    if (this.invalidRequestTimestamps.length < REST.INVALID_REQUEST_SAFETY_LIMIT) return;
+
+    const oldest = this.invalidRequestTimestamps[0];
+    const waitMs = oldest + REST.INVALID_REQUEST_WINDOW_MS - Date.now();
+    if (waitMs > 0) await delay(waitMs);
   }
 
   private buildUrl(options: RequestOptions): string {
