@@ -41,6 +41,7 @@ export interface MessageCreateData {
   components?: JSONEncodable[];
   files?: AttachmentBuilder[];
   poll?: JSONEncodable;
+  stickerIds?: string[];
   flags?: number;
 }
 
@@ -58,12 +59,13 @@ export interface ResolvedPayload {
 export function normalizeMessagePayload(payload: MessagePayload): ResolvedPayload {
   if (typeof payload === "string") return { body: { content: payload } };
 
-  const { files, ...rest } = payload;
+  const { files, stickerIds, ...rest } = payload;
   const body: Record<string, unknown> = {
     ...rest,
     embeds: payload.embeds?.map(resolve),
     components: payload.components?.map(resolve),
     poll: payload.poll?.toJSON(),
+    sticker_ids: stickerIds,
   };
   if (files?.length) body.attachments = files.map((file, index) => ({ id: index, ...file.toJSON() }));
 
@@ -95,7 +97,12 @@ export class Message extends Base {
   public async reply(payload: MessagePayload): Promise<Message> {
     const { body, files } = normalizeMessagePayload(payload);
     body.message_reference = { message_id: this.id };
-    const data = await this.client.rest.post<APIMessage>(`/channels/${this.channelId}/messages`, body, undefined, files);
+    const data = await this.client.rest.post<APIMessage>(
+      `/channels/${this.channelId}/messages`,
+      body,
+      undefined,
+      files,
+    );
     return new Message(this.client, data);
   }
 
