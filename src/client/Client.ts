@@ -46,6 +46,7 @@ type ClientEvents = {
   ready: [];
   resumed: [];
   debug: [string];
+  error: [import("../util/Errors").GatewayError];
   messageCreate: [Message];
   messageUpdate: [Record<string, unknown>];
   messageDelete: [{ id: string; channelId: string; guildId: string | null }];
@@ -175,6 +176,7 @@ export class Client extends EventEmitter {
     });
     gateway.on("dispatch", (event, data) => this.onDispatch(event, data));
     gateway.on("debug", (message) => this.emit("debug", `[shard ${shardId}] ${message}`));
+    gateway.on("error", (error) => this.emit("error", error));
     gateway.connect();
     this._gateways[shardId] = gateway;
   }

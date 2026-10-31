@@ -1,5 +1,6 @@
 import { EventEmitter } from "node:events";
 import { GATEWAY_URL, GatewayCloseCodes, GatewayOpcodes, UNRECOVERABLE_CLOSE_CODES } from "../util/Constants";
+import { GatewayError } from "../util/Errors";
 
 export interface GatewayPayload<T = unknown> {
   op: GatewayOpcodes;
@@ -23,6 +24,7 @@ type GatewayEvents = {
   ready: [];
   close: [number];
   debug: [string];
+  error: [GatewayError];
 };
 
 /**
@@ -165,7 +167,7 @@ export class Gateway extends EventEmitter {
     if (this.destroyed) return;
 
     if (UNRECOVERABLE_CLOSE_CODES.has(code)) {
-      this.emit("debug", `unrecoverable close code ${code}, not reconnecting`);
+      this.emit("error", new GatewayError(code, `unrecoverable close code ${code}, not reconnecting`));
       return;
     }
 
