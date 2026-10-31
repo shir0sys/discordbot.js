@@ -15,7 +15,12 @@ import { createChannel } from "./ChannelFactory";
 import { GuildEmoji, type APIEmoji } from "./Emoji";
 import { Sticker, type APISticker } from "./Sticker";
 import { VoiceState, type APIVoiceState } from "./VoiceState";
-import { GuildOnboarding, type APIGuildOnboarding, type APIGuildWidgetSettings, type APIGuildPreview } from "./GuildOnboarding";
+import {
+  GuildOnboarding,
+  type APIGuildOnboarding,
+  type APIGuildWidgetSettings,
+  type APIGuildPreview,
+} from "./GuildOnboarding";
 import { GuildTemplateManager } from "../managers/GuildTemplateManager";
 import { Invite, type APIInvite } from "./Invite";
 import type { Client } from "../client/Client";
@@ -122,7 +127,10 @@ export class Guild extends Base {
     return new GuildOnboarding(data);
   }
 
-  public async editOnboarding(data: Partial<Pick<APIGuildOnboarding, "prompts" | "default_channel_ids" | "enabled" | "mode">>, reason?: string): Promise<GuildOnboarding> {
+  public async editOnboarding(
+    data: Partial<Pick<APIGuildOnboarding, "prompts" | "default_channel_ids" | "enabled" | "mode">>,
+    reason?: string,
+  ): Promise<GuildOnboarding> {
     const payload = await this.client.rest.put<APIGuildOnboarding>(`/guilds/${this.id}/onboarding`, data, reason);
     return new GuildOnboarding(payload);
   }
@@ -148,9 +156,64 @@ export class Guild extends Base {
     return this.client.rest.get(`/guilds/${this.id}/vanity-url`);
   }
 
-  public async fetchAuditLogs(options: { limit?: number; user_id?: string; action_type?: number } = {}): Promise<
-    import("./AuditLogEntry").AuditLogEntry[]
-  > {
+  public async fetchWebhooks(): Promise<import("./Webhook").Webhook[]> {
+    const { Webhook } = await import("./Webhook");
+    const data = await this.client.rest.get<import("./Webhook").APIWebhook[]>(`/guilds/${this.id}/webhooks`);
+    return data.map((webhook) => new Webhook(this.client, webhook));
+  }
+
+  public async edit(
+    data: Partial<{
+      name: string;
+      icon: string | null;
+      owner_id: string;
+      afk_channel_id: string | null;
+      afk_timeout: number;
+    }>,
+    reason?: string,
+  ): Promise<this> {
+    const payload = await this.client.rest.patch<APIGuild>(`/guilds/${this.id}`, data, reason);
+    return this._patch(payload);
+  }
+
+  public async delete(): Promise<void> {
+    await this.client.rest.delete(`/guilds/${this.id}`);
+  }
+
+  public async fetchIntegrations(): Promise<unknown[]> {
+    return this.client.rest.get(`/guilds/${this.id}/integrations`);
+  }
+
+  public async fetchWelcomeScreen(): Promise<{ description: string | null; welcome_channels: unknown[] }> {
+    return this.client.rest.get(`/guilds/${this.id}/welcome-screen`);
+  }
+
+  public async editWelcomeScreen(
+    data: Partial<{ enabled: boolean; description: string; welcome_channels: unknown[] }>,
+    reason?: string,
+  ): Promise<{ description: string | null; welcome_channels: unknown[] }> {
+    return this.client.rest.patch(`/guilds/${this.id}/welcome-screen`, data, reason);
+  }
+
+  public async fetchPruneCount(days = 7): Promise<number> {
+    const data = await this.client.rest.get<{ pruned: number }>(`/guilds/${this.id}/prune`, { days });
+    return data.pruned;
+  }
+
+  public async prune(
+    options: { days?: number; computePruneCount?: boolean; reason?: string } = {},
+  ): Promise<number | null> {
+    const data = await this.client.rest.post<{ pruned: number | null }>(
+      `/guilds/${this.id}/prune`,
+      { days: options.days ?? 7, compute_prune_count: options.computePruneCount ?? true },
+      options.reason,
+    );
+    return data.pruned;
+  }
+
+  public async fetchAuditLogs(
+    options: { limit?: number; user_id?: string; action_type?: number } = {},
+  ): Promise<import("./AuditLogEntry").AuditLogEntry[]> {
     const { AuditLogEntry } = await import("./AuditLogEntry");
     const data = await this.client.rest.get<{ audit_log_entries: ConstructorParameters<typeof AuditLogEntry>[0][] }>(
       `/guilds/${this.id}/audit-logs`,

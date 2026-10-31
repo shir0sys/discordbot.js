@@ -1,5 +1,6 @@
 import { Base } from "./Base";
 import { Invite, type APIInvite } from "./Invite";
+import { Webhook, type APIWebhook } from "./Webhook";
 import { ChannelType } from "../util/Constants";
 import { PermissionsBitField, computeChannelPermissions, type APIPermissionOverwrite } from "../util/Permissions";
 import type { Client } from "../client/Client";
@@ -72,7 +73,11 @@ export class Channel extends Base {
   }
 
   /** Effective permissions for a member in this channel, given their role permission bitfield and role ids. */
-  public permissionsFor(basePermissions: PermissionsBitField, memberId: string, memberRoleIds: string[]): PermissionsBitField {
+  public permissionsFor(
+    basePermissions: PermissionsBitField,
+    memberId: string,
+    memberRoleIds: string[],
+  ): PermissionsBitField {
     if (!this.guildId) return basePermissions;
     return computeChannelPermissions(basePermissions, this.permissionOverwrites, this.guildId, memberId, memberRoleIds);
   }
@@ -112,6 +117,16 @@ export class Channel extends Base {
   public async fetchInvites(): Promise<Invite[]> {
     const data = await this.client.rest.get<APIInvite[]>(`/channels/${this.id}/invites`);
     return data.map((invite) => new Invite(this.client, invite));
+  }
+
+  public async createWebhook(data: { name: string; avatar?: string }, reason?: string): Promise<Webhook> {
+    const payload = await this.client.rest.post<APIWebhook>(`/channels/${this.id}/webhooks`, data, reason);
+    return new Webhook(this.client, payload);
+  }
+
+  public async fetchWebhooks(): Promise<Webhook[]> {
+    const data = await this.client.rest.get<APIWebhook[]>(`/channels/${this.id}/webhooks`);
+    return data.map((webhook) => new Webhook(this.client, webhook));
   }
 
   public toString(): string {
