@@ -8,10 +8,8 @@ export class DMChannel extends Channel {
   }
 
   public async send(payload: MessagePayload): Promise<Message> {
-    const data = await this.client.rest.post<APIMessage>(
-      `/channels/${this.id}/messages`,
-      normalizeMessagePayload(payload),
-    );
+    const { body, files } = normalizeMessagePayload(payload);
+    const data = await this.client.rest.post<APIMessage>(`/channels/${this.id}/messages`, body, undefined, files);
     return new Message(this.client, data);
   }
 }
