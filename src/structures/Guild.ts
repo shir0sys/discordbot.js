@@ -17,6 +17,7 @@ import { Sticker, type APISticker } from "./Sticker";
 import { VoiceState, type APIVoiceState } from "./VoiceState";
 import { GuildOnboarding, type APIGuildOnboarding, type APIGuildWidgetSettings, type APIGuildPreview } from "./GuildOnboarding";
 import { GuildTemplateManager } from "../managers/GuildTemplateManager";
+import { Invite, type APIInvite } from "./Invite";
 import type { Client } from "../client/Client";
 
 export interface APIGuild {
@@ -136,6 +137,11 @@ export class Guild extends Base {
 
   public fetchPreview(): Promise<APIGuildPreview> {
     return this.client.rest.get<APIGuildPreview>(`/guilds/${this.id}/preview`);
+  }
+
+  public async fetchInvites(): Promise<Invite[]> {
+    const data = await this.client.rest.get<APIInvite[]>(`/guilds/${this.id}/invites`);
+    return data.map((invite) => new Invite(this.client, invite));
   }
 
   public async fetchVanityURL(): Promise<{ code: string | null; uses: number }> {

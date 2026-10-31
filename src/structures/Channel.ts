@@ -1,4 +1,5 @@
 import { Base } from "./Base";
+import { Invite, type APIInvite } from "./Invite";
 import { ChannelType } from "../util/Constants";
 import { PermissionsBitField, computeChannelPermissions, type APIPermissionOverwrite } from "../util/Permissions";
 import type { Client } from "../client/Client";
@@ -46,6 +47,18 @@ export class Channel extends Base {
     return this.type === ChannelType.GuildVoice || this.type === ChannelType.GuildStageVoice;
   }
 
+  public isStage(): this is import("./StageChannel").StageChannel {
+    return this.type === ChannelType.GuildStageVoice;
+  }
+
+  public isCategory(): this is import("./CategoryChannel").CategoryChannel {
+    return this.type === ChannelType.GuildCategory;
+  }
+
+  public isForum(): this is import("./ForumChannel").ForumChannel {
+    return this.type === ChannelType.GuildForum || this.type === ChannelType.GuildMedia;
+  }
+
   public isDM(): this is import("./DMChannel").DMChannel {
     return this.type === ChannelType.DM;
   }
@@ -86,6 +99,19 @@ export class Channel extends Base {
 
   public async delete(reason?: string): Promise<void> {
     await this.client.rest.delete(`/channels/${this.id}`, reason);
+  }
+
+  public async createInvite(
+    data: { max_age?: number; max_uses?: number; temporary?: boolean; unique?: boolean } = {},
+    reason?: string,
+  ): Promise<Invite> {
+    const payload = await this.client.rest.post<APIInvite>(`/channels/${this.id}/invites`, data, reason);
+    return new Invite(this.client, payload);
+  }
+
+  public async fetchInvites(): Promise<Invite[]> {
+    const data = await this.client.rest.get<APIInvite[]>(`/channels/${this.id}/invites`);
+    return data.map((invite) => new Invite(this.client, invite));
   }
 
   public toString(): string {
