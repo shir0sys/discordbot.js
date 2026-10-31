@@ -1,7 +1,7 @@
 {
   "name": "discordbot.js",
   "version": "0.1.0",
-  "description": "Zero-dependency Discord API v10 wrapper (REST + Gateway) for Node.js",
+  "description": "Discord API v10 wrapper (REST + Gateway + voice) for Node.js, built on native fetch/WebSocket/crypto/dgram",
   "main": "dist/index.js",
   "types": "dist/index.d.ts",
   "files": [
@@ -33,14 +33,16 @@
   },
   "author": "shir0sys",
   "devDependencies": {
-    "typescript": "^5.4.0",
     "@types/node": "^20.11.0",
     "eslint": "^10.0.0",
-    "typescript-eslint": "^8.0.0",
+    "eslint-config-prettier": "^10.0.0",
     "prettier": "^3.0.0",
-    "eslint-config-prettier": "^10.0.0"
+    "typescript": "^5.4.0",
+    "typescript-eslint": "^8.0.0"
   },
-  "dependencies": {},
+  "dependencies": {
+    "opusscript": "^0.1.1"
+  },
   "keywords": [
     "discord",
     "discord-api",
@@ -48,7 +50,7 @@
     "api",
     "gateway",
     "bot",
-    "zero-dependency",
+    "voice",
     "typescript"
   ]
 }
