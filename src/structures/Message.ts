@@ -1,5 +1,7 @@
 import { Base } from "./Base";
 import { User, type APIUser } from "./User";
+import type { JSONEncodable } from "../builders/Components";
+import type { APIEmbed } from "../builders/EmbedBuilder";
 import type { Client } from "../client/Client";
 
 export interface APIMessage {
@@ -12,10 +14,26 @@ export interface APIMessage {
   edited_timestamp: string | null;
 }
 
-export type MessagePayload = string | { content?: string; embeds?: unknown[]; components?: unknown[] };
+export interface MessageCreateData {
+  content?: string;
+  embeds?: (APIEmbed | JSONEncodable)[];
+  components?: JSONEncodable[];
+  flags?: number;
+}
+
+export type MessagePayload = string | MessageCreateData;
+
+function resolve(value: APIEmbed | JSONEncodable): unknown {
+  return typeof (value as JSONEncodable).toJSON === "function" ? (value as JSONEncodable).toJSON() : value;
+}
 
 export function normalizeMessagePayload(payload: MessagePayload): Record<string, unknown> {
-  return typeof payload === "string" ? { content: payload } : payload;
+  if (typeof payload === "string") return { content: payload };
+  return {
+    ...payload,
+    embeds: payload.embeds?.map(resolve),
+    components: payload.components?.map(resolve),
+  };
 }
 
 export class Message extends Base {
