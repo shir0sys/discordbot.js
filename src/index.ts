@@ -1,4 +1,10 @@
-export { Client, type ClientOptions } from "./client/Client";
+export {
+  Client,
+  type ClientOptions,
+  type TypingStartData,
+  type PollVoteData,
+  type GuildMembersChunkData,
+} from "./client/Client";
 export { REST, DiscordAPIError, type RESTOptions, type RESTFile } from "./rest/REST";
 export { Bucket } from "./rest/Bucket";
 export { Gateway, type GatewayOptions } from "./gateway/Gateway";
@@ -24,6 +30,7 @@ export { GuildChannelManager } from "./managers/GuildChannelManager";
 export { GuildBanManager } from "./managers/GuildBanManager";
 export { MessageManager } from "./managers/MessageManager";
 export { ThreadManager } from "./managers/ThreadManager";
+export { ThreadMemberManager } from "./managers/ThreadMemberManager";
 export { GuildEmojiManager } from "./managers/GuildEmojiManager";
 export { GuildStickerManager } from "./managers/GuildStickerManager";
 export { SoundboardManager, GuildSoundboardManager } from "./managers/SoundboardManager";
@@ -41,8 +48,13 @@ export { Channel, type APIChannel } from "./structures/Channel";
 export { createChannel } from "./structures/ChannelFactory";
 export { TextChannel } from "./structures/TextChannel";
 export { VoiceChannel } from "./structures/VoiceChannel";
+export { StageChannel } from "./structures/StageChannel";
+export { CategoryChannel } from "./structures/CategoryChannel";
+export { ForumChannel, type APIForumChannel, type APIForumTag } from "./structures/ForumChannel";
+export { MediaChannel } from "./structures/MediaChannel";
 export { DMChannel } from "./structures/DMChannel";
 export { ThreadChannel, type APIThreadChannel, type APIThreadMetadata } from "./structures/ThreadChannel";
+export { ThreadMember, type APIThreadMember } from "./structures/ThreadMember";
 export { Message, type APIMessage, type APIAttachment, type MessagePayload, type MessageCreateData, type ResolvedPayload } from "./structures/Message";
 export { MessageReaction, type APIMessageReaction } from "./structures/MessageReaction";
 export { Emoji, GuildEmoji, type APIEmoji as APIEmojiData } from "./structures/Emoji";
@@ -66,6 +78,9 @@ export {
 export { SoundboardSound, type APISoundboardSound } from "./structures/SoundboardSound";
 export { SKU, type APISKU } from "./structures/SKU";
 export { Entitlement, type APIEntitlement } from "./structures/Entitlement";
+export { Presence, Activity, ActivityType, PresenceStatus, type APIPresence, type APIActivity } from "./structures/Presence";
+export { Invite, type APIInvite, type PartialInvite } from "./structures/Invite";
+export { GuildBan, type APIBan } from "./structures/GuildBan";
 
 export { Interaction, type APIInteraction, type APIInteractionData, type APIInteractionOption } from "./structures/Interaction";
 export { CommandInteraction } from "./structures/CommandInteraction";
