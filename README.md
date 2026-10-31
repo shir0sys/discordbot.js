@@ -12,7 +12,9 @@ npm run build
 DISCORD_TOKEN=xxx node --env-file=.env example.js
 ```
 
-See [example.js](./example.js) for a bot registering slash commands, text commands, buttons/select menus, Components V2, modals, and a context menu command.
+See [example.js](./example.js) for a tour of the library: slash commands, text commands, buttons/select menus, Components V2, modals, context menu commands, moderation, permissions, threads, webhooks, polls, collectors, audit logs and error handling.
+
+See [examples/ticket-bot.js](./examples/ticket-bot.js) for a complete, restart-safe support ticket system (open/claim/close via buttons and context menu commands).
 
 ## Testing
 
