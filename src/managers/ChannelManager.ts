@@ -1,6 +1,6 @@
 import { Collection } from "./Collection";
 import { Channel, type APIChannel } from "../structures/Channel";
-import { createChannel } from "../structures/Guild";
+import { createChannel } from "../structures/ChannelFactory";
 import type { Client } from "../client/Client";
 
 export class ChannelManager {
