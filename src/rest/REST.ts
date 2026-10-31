@@ -1,5 +1,6 @@
 import { Bucket } from "./Bucket";
 import { REST_BASE_URL } from "../util/Constants";
+import { HTTPError, RateLimitError } from "../util/Errors";
 
 export interface RESTOptions {
   token: string;
@@ -115,14 +116,17 @@ export class REST {
       const payload = await response.json().catch(() => ({}));
       const retryAfterMs = (payload.retry_after ?? 1) * 1000;
       bucket.lockFor(retryAfterMs);
-      if (attempt >= this.maxRetries) throw new DiscordAPIError(response.status, payload);
+      if (attempt >= this.maxRetries) throw new RateLimitError(retryAfterMs, options.path);
       await delay(retryAfterMs);
       return this.execute<T>(options, routeKey, attempt + 1);
     }
 
-    if (response.status >= 500 && attempt < this.maxRetries) {
-      await delay(backoff(attempt));
-      return this.execute<T>(options, routeKey, attempt + 1);
+    if (response.status >= 500) {
+      if (attempt < this.maxRetries) {
+        await delay(backoff(attempt));
+        return this.execute<T>(options, routeKey, attempt + 1);
+      }
+      throw new HTTPError(response.status, `${options.method} ${options.path} failed after ${attempt + 1} attempts`);
     }
 
     if (response.status === 204) return undefined as T;
