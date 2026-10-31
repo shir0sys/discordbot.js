@@ -14,6 +14,9 @@ const {
   ModalBuilder,
   TextInputBuilder,
   SlashCommandBuilder,
+  ContextMenuCommandBuilder,
+  ApplicationCommandType,
+  Formatters,
 } = require("./dist");
 
 const client = new Client({
@@ -42,9 +45,11 @@ const v2Command = new SlashCommandBuilder()
 
 const feedbackCommand = new SlashCommandBuilder().setName("feedback").setDescription("Opens a feedback modal");
 
+const userInfoContextMenu = new ContextMenuCommandBuilder().setName("User info").setType(ApplicationCommandType.User);
+
 client.on("ready", async () => {
   console.log(`Logged in as ${client.user.tag}`);
-  await client.application.set([pingCommand, sayCommand, panelCommand, v2Command, feedbackCommand]);
+  await client.application.set([pingCommand, sayCommand, panelCommand, v2Command, feedbackCommand, userInfoContextMenu]);
 });
 
 client.on("guildCreate", (guild) => {
@@ -126,6 +131,11 @@ client.on("interactionCreate", async (interaction) => {
           );
 
         await interaction.reply({ components: [container], flags: MessageFlags.IsComponentsV2 });
+        break;
+      }
+
+      case "User info": {
+        await interaction.reply(`Target user: ${Formatters.userMention(interaction.targetId)}`);
         break;
       }
 
