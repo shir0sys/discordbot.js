@@ -8,6 +8,7 @@ const {
   TextInputStyle,
   MessageFlags,
   ApplicationCommandType,
+  AuditLogEvent,
   EmbedBuilder,
   ActionRowBuilder,
   ButtonBuilder,
@@ -373,7 +374,13 @@ async function handleCommand(interaction) {
       const entries = await guild.fetchAuditLogs({ limit: 5 });
       await interaction.reply(
         entries.length
-          ? entries.map((e) => `• action ${e.actionType} on ${e.targetId ?? "?"}`).join("\n")
+          ? entries
+              // AuditLogEvent is a numeric TS enum, which auto-generates a reverse
+              // number -> name mapping at runtime (AuditLogEvent[52] === "WebhookDelete").
+              .map(
+                (e) => `• **${AuditLogEvent[e.actionType] ?? `action ${e.actionType}`}** on \`${e.targetId ?? "?"}\``,
+              )
+              .join("\n")
           : "No recent audit log entries (or missing View Audit Log permission).",
       );
       return;
