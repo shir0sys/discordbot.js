@@ -162,3 +162,23 @@ export {
   type RefreshTokenOptions,
 } from "./oauth2/OAuth2";
 export { OAuth2User, type APIUserGuild, type APIConnection } from "./oauth2/OAuth2User";
+
+export { VoiceConnection, VoiceConnectionStatus, type VoiceConnectionOptions } from "./voice/VoiceConnection";
+export {
+  VoiceGateway,
+  type VoiceGatewayOptions,
+  type VoiceReadyData,
+  type VoiceSessionDescription,
+} from "./voice/VoiceGateway";
+export { VoiceUDP, buildRtpPacket, type IPDiscoveryResult } from "./voice/VoiceUDP";
+export { AudioPlayer, AudioPlayerStatus } from "./voice/AudioPlayer";
+export { AudioResource } from "./voice/AudioResource";
+export { OpusEncoder, PCM_FRAME_BYTES } from "./voice/OpusEncoder";
+export {
+  VoiceOpcodes,
+  ENCRYPTION_MODE,
+  SAMPLE_RATE,
+  CHANNELS,
+  FRAME_DURATION_MS,
+  SAMPLES_PER_FRAME,
+} from "./voice/VoiceConstants";

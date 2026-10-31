@@ -24,6 +24,15 @@ module.exports = tseslint.config(
     },
   },
   {
+    // opusscript only ships an `export =` CJS module, so `import X = require(...)`
+    // (TypeScript's dedicated syntax for that, not a plain CommonJS require()) is
+    // the correct way to import it — the rule can't tell the two apart.
+    files: ["src/voice/OpusEncoder.ts"],
+    rules: {
+      "@typescript-eslint/no-require-imports": "off",
+    },
+  },
+  {
     files: ["test/**/*.js", "example.js", "examples/**/*.js"],
     languageOptions: {
       sourceType: "commonjs",
