@@ -239,6 +239,23 @@ export class Client extends EventEmitter {
     this.voiceConnections.get(guildId)?.destroy();
     this.voiceConnections.delete(guildId);
 
+    // Discord still considers the bot connected to whatever voice channel
+    // it last joined until it's explicitly told to leave — that includes
+    // across process restarts, and after a prior join attempt that timed
+    // out on our side without ever sending a leave. Re-identifying a new
+    // voice session while the old one is still live server-side is a
+    // reliable way to get a session_id/token pair back that's invalidated
+    // moments later by the still-active old session (close code 4006).
+    // Forcing a leave first, and giving Discord a moment to process it,
+    // avoids that race.
+    this.shardFor(guildId).send(GatewayOpcodes.VoiceStateUpdate, {
+      guild_id: guildId,
+      channel_id: null,
+      self_mute: false,
+      self_deaf: false,
+    });
+    await new Promise((resolve) => setTimeout(resolve, 250));
+
     const cleanups: (() => void)[] = [];
 
     const statePromise = new Promise<VoiceState>((resolve) => {
