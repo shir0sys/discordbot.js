@@ -26,12 +26,25 @@ const client = new Client({
 // guildId -> { player, ytdlp, ffmpeg }
 const sessions = new Map();
 
+// A process that never actually spawned (e.g. ENOENT) has no valid handle —
+// calling .kill() on it throws synchronously on Windows (EINVAL) instead of
+// just being a no-op like on POSIX. Also guards against killing a process
+// twice, which both the 'idle' handler and a failed-spawn handler can race to do.
+function safeKill(child) {
+  if (!child.pid) return;
+  try {
+    child.kill();
+  } catch {
+    // already dead or never started — nothing to do
+  }
+}
+
 function stopSession(guildId) {
   const session = sessions.get(guildId);
   if (!session) return;
   session.player.stop();
-  session.ytdlp.kill();
-  session.ffmpeg.kill();
+  safeKill(session.ytdlp);
+  safeKill(session.ffmpeg);
   sessions.delete(guildId);
 }
 
@@ -101,8 +114,8 @@ client.on("interactionCreate", async (interaction) => {
       const failPlayback = (binary) => (error) => {
         console.error(`${binary} failed:`, error.message);
         player.stop();
-        ytdlp.kill();
-        ffmpeg.kill();
+        safeKill(ytdlp);
+        safeKill(ffmpeg);
         sessions.delete(interaction.guildId);
         interaction
           .editReply(`Could not start \`${binary}\` — make sure it's installed and on your PATH.`)
@@ -114,8 +127,8 @@ client.on("interactionCreate", async (interaction) => {
       const resource = AudioResource.fromPCMStream(ffmpeg.stdout);
       player.play(resource);
       player.once("idle", () => {
-        ytdlp.kill();
-        ffmpeg.kill();
+        safeKill(ytdlp);
+        safeKill(ffmpeg);
         sessions.delete(interaction.guildId);
       });
 
