@@ -95,6 +95,22 @@ client.on("interactionCreate", async (interaction) => {
       const player = new AudioPlayer();
       connection.subscribe(player);
 
+      // A missing binary (ENOENT) or a crash fires 'error' on the child
+      // process asynchronously — without a listener, Node treats an
+      // unhandled 'error' event as fatal and kills the whole bot.
+      const failPlayback = (binary) => (error) => {
+        console.error(`${binary} failed:`, error.message);
+        player.stop();
+        ytdlp.kill();
+        ffmpeg.kill();
+        sessions.delete(interaction.guildId);
+        interaction
+          .editReply(`Could not start \`${binary}\` — make sure it's installed and on your PATH.`)
+          .catch(() => {});
+      };
+      ytdlp.on("error", failPlayback("yt-dlp"));
+      ffmpeg.on("error", failPlayback("ffmpeg"));
+
       const resource = AudioResource.fromPCMStream(ffmpeg.stdout);
       player.play(resource);
       player.once("idle", () => {
