@@ -24,6 +24,11 @@ export { GuildChannelManager } from "./managers/GuildChannelManager";
 export { GuildBanManager } from "./managers/GuildBanManager";
 export { MessageManager } from "./managers/MessageManager";
 export { ThreadManager } from "./managers/ThreadManager";
+export { GuildEmojiManager } from "./managers/GuildEmojiManager";
+export { GuildStickerManager } from "./managers/GuildStickerManager";
+export { SoundboardManager, GuildSoundboardManager } from "./managers/SoundboardManager";
+export { MonetizationManager } from "./managers/MonetizationManager";
+export { GuildTemplateManager, fetchGuildTemplate, createGuildFromTemplate } from "./managers/GuildTemplateManager";
 export { ApplicationCommandManager, type ApplicationCommandData, type CommandInput } from "./managers/ApplicationCommandManager";
 
 export { Base } from "./structures/Base";
@@ -48,6 +53,19 @@ export { StageInstance, type APIStageInstance } from "./structures/StageInstance
 export { GuildScheduledEvent, type APIGuildScheduledEvent } from "./structures/GuildScheduledEvent";
 export { AutoModerationRule, type APIAutoModerationRule } from "./structures/AutoModerationRule";
 export { AuditLogEntry, type APIAuditLogEntry, type APIAuditLogChange } from "./structures/AuditLogEntry";
+export { GuildTemplate, type APIGuildTemplate } from "./structures/GuildTemplate";
+export {
+  GuildOnboarding,
+  fetchPublicWidget,
+  type APIGuildOnboarding,
+  type APIOnboardingPrompt,
+  type APIGuildWidgetSettings,
+  type APIGuildPreview,
+  type APIPublicWidget,
+} from "./structures/GuildOnboarding";
+export { SoundboardSound, type APISoundboardSound } from "./structures/SoundboardSound";
+export { SKU, type APISKU } from "./structures/SKU";
+export { Entitlement, type APIEntitlement } from "./structures/Entitlement";
 
 export { Interaction, type APIInteraction, type APIInteractionData, type APIInteractionOption } from "./structures/Interaction";
 export { CommandInteraction } from "./structures/CommandInteraction";
@@ -86,3 +104,18 @@ export { SlashCommandBuilder, SlashCommandSubcommandBuilder } from "./builders/S
 export { ContextMenuCommandBuilder } from "./builders/ContextMenuCommandBuilder";
 export { AttachmentBuilder } from "./builders/AttachmentBuilder";
 export { PollBuilder, type PollAnswerData } from "./builders/PollBuilder";
+
+export { ShardingManager, type ShardingManagerOptions } from "./sharding/ShardingManager";
+export { ShardClientUtil } from "./sharding/ShardClientUtil";
+
+export {
+  getAuthorizationURL,
+  exchangeCode,
+  refreshAccessToken,
+  revokeToken,
+  type OAuth2TokenResponse,
+  type AuthorizationURLOptions,
+  type ExchangeCodeOptions,
+  type RefreshTokenOptions,
+} from "./oauth2/OAuth2";
+export { OAuth2User, type APIUserGuild, type APIConnection } from "./oauth2/OAuth2User";
