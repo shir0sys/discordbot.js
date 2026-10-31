@@ -39,6 +39,16 @@ export class TextChannel extends Channel {
     await this.client.rest.post(`/channels/${this.id}/typing`);
   }
 
+  public async setTopic(topic: string, reason?: string): Promise<void> {
+    await this.client.rest.patch(`/channels/${this.id}`, { topic }, reason);
+    this.topic = topic;
+  }
+
+  public async setParent(parentId: string | null, reason?: string): Promise<void> {
+    await this.client.rest.patch(`/channels/${this.id}`, { parent_id: parentId }, reason);
+    this.parentId = parentId;
+  }
+
   public async fetchPins(): Promise<Message[]> {
     const data = await this.client.rest.get<APIMessage[]>(`/channels/${this.id}/pins`);
     return data.map((message) => new Message(this.client, message));

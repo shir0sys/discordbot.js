@@ -1,7 +1,21 @@
 import { Collection } from "./Collection";
 import { Channel, type APIChannel } from "../structures/Channel";
 import { createChannel } from "../structures/ChannelFactory";
+import type { APIPermissionOverwrite } from "../util/Permissions";
 import type { Client } from "../client/Client";
+
+export interface GuildChannelCreateData {
+  name: string;
+  type?: number;
+  topic?: string;
+  parent_id?: string;
+  nsfw?: boolean;
+  rate_limit_per_user?: number;
+  bitrate?: number;
+  user_limit?: number;
+  position?: number;
+  permission_overwrites?: APIPermissionOverwrite[];
+}
 
 export class GuildChannelManager extends Collection<string, Channel> {
   constructor(
@@ -11,7 +25,7 @@ export class GuildChannelManager extends Collection<string, Channel> {
     super();
   }
 
-  public async create(data: { name: string; type?: number; parent_id?: string }, reason?: string): Promise<Channel> {
+  public async create(data: GuildChannelCreateData, reason?: string): Promise<Channel> {
     const payload = await this.client.rest.post<APIChannel>(`/guilds/${this.guildId}/channels`, data, reason);
     const channel = createChannel(this.client, payload);
     this.set(channel.id, channel);
