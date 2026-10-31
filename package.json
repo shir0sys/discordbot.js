@@ -1,0 +1,28 @@
+{
+  "name": "discordbot.js",
+  "version": "0.1.0",
+  "description": "Zero-dependency Discord API v10 wrapper (REST + Gateway) for Node.js",
+  "main": "dist/index.js",
+  "types": "dist/index.d.ts",
+  "engines": {
+    "node": ">=22.0.0"
+  },
+  "scripts": {
+    "build": "tsc -p .",
+    "watch": "tsc -p . --watch",
+    "example": "node example.js"
+  },
+  "license": "MIT",
+  "devDependencies": {
+    "typescript": "^5.4.0",
+    "@types/node": "^20.11.0"
+  },
+  "dependencies": {},
+  "keywords": [
+    "discord",
+    "api",
+    "gateway",
+    "ws",
+    "bot"
+  ]
+}

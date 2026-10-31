@@ -1,0 +1,7 @@
+node_modules/
+dist/
+.env
+*.log
+.vscode/
+CLAUDE.md
+commitex.txt
