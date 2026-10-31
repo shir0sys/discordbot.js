@@ -2,7 +2,7 @@
 
 [![CI](https://github.com/shir0sys/discordbot.js/actions/workflows/ci.yml/badge.svg)](https://github.com/shir0sys/discordbot.js/actions/workflows/ci.yml)
 
-Zero-dependency Discord API v10 wrapper for Node.js (>=22), built on native `fetch`, `WebSocket`, and `EventEmitter` only.
+A Discord API v10 wrapper for Node.js (>=22). REST, gateway, interactions, builders and voice are all built on Node's native `fetch`/`WebSocket`/`EventEmitter`/`crypto`/`dgram` — the one real runtime dependency is [`opusscript`](https://www.npmjs.com/package/opusscript) (a pure WASM port of libopus), used only by the voice module for Opus encoding.
 
 ## Usage
 
@@ -15,6 +15,8 @@ DISCORD_TOKEN=xxx node --env-file=.env example.js
 See [example.js](./example.js) for a tour of the library: slash commands, text commands, buttons/select menus, Components V2, modals, context menu commands, moderation, permissions, threads, webhooks, polls, collectors, audit logs and error handling.
 
 See [examples/ticket-bot.js](./examples/ticket-bot.js) for a complete, restart-safe support ticket system (open/claim/close via buttons and context menu commands).
+
+See [examples/voice-bot.js](./examples/voice-bot.js) for joining a voice channel and playing audio (`/play`, `/stop`) — needs `ffmpeg` installed separately as a system binary to transcode input into raw PCM.
 
 ## Testing
 
@@ -33,7 +35,10 @@ Runs the TypeScript build then the test suite with Node's built-in test runner (
 - `src/managers` — caches and REST-backed collections (`Collection`, `GuildMemberManager`, `RoleManager`, `MessageManager`, ...).
 - `src/builders` — `EmbedBuilder`, classic components (buttons/select menus), Components V2 layout components, modals, `SlashCommandBuilder`, `ContextMenuCommandBuilder`, `AttachmentBuilder`, `PollBuilder`.
 - `src/util` — bitfields (`PermissionsBitField`, `IntentsBitField`, ...), `Formatters`, `SnowflakeUtil`, color resolution, typed errors.
+- `src/voice` — voice gateway v8 client, UDP transport (IP discovery, RTP framing, AES-256-GCM encryption via `node:crypto`), `AudioPlayer`/`AudioResource`, and the `opusscript`-backed `OpusEncoder`.
 
-## Scope
+## Scope and caveats
 
-Voice (voice gateway, RTP, Opus encode/decode) is intentionally not implemented: doing it without a third-party dependency means writing a pure-JS/WASM Opus codec from scratch, which is out of scope for this pass.
+- **Voice protocol correctness is untested against a live Discord voice server.** The gateway handshake, UDP IP discovery, RTP framing and AES-256-GCM encryption are implemented from Discord's written documentation and unit-tested for internal consistency (the crypto round-trips against Node's own AES-GCM, Opus encode/decode round-trips through real libopus), but exact byte-level agreement with Discord's servers has only been verified by inspection, not a real connection. Expect to debug it against a real bot/voice channel.
+- No voice *receive* (listening to other members) — send-only.
+- No automatic reconnection/resilience on voice gateway drops beyond a basic reconnect; no jitter buffering.
