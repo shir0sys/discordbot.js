@@ -4,6 +4,11 @@
   "description": "Zero-dependency Discord API v10 wrapper (REST + Gateway) for Node.js",
   "main": "dist/index.js",
   "types": "dist/index.d.ts",
+  "files": [
+    "dist",
+    "README.md",
+    "LICENSE"
+  ],
   "engines": {
     "node": ">=22.0.0"
   },
@@ -11,19 +16,39 @@
     "build": "tsc -p .",
     "watch": "tsc -p . --watch",
     "example": "node example.js",
-    "test": "tsc -p . && node --test test/*.test.js"
+    "test": "tsc -p . && node --test test/*.test.js",
+    "lint": "eslint src test",
+    "format": "prettier --write \"src/**/*.ts\" \"test/**/*.js\" \"example.js\" \"tsconfig.json\" \"package.json\"",
+    "format:check": "prettier --check \"src/**/*.ts\" \"test/**/*.js\" \"example.js\" \"tsconfig.json\" \"package.json\"",
+    "prepublishOnly": "npm run lint && npm run format:check && npm test"
   },
   "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/shir0sys/discordbot.js.git"
+  },
+  "homepage": "https://shir0sys.github.io/DiscordBotjs-docs/",
+  "bugs": {
+    "url": "https://github.com/shir0sys/discordbot.js/issues"
+  },
+  "author": "shir0sys",
   "devDependencies": {
     "typescript": "^5.4.0",
-    "@types/node": "^20.11.0"
+    "@types/node": "^20.11.0",
+    "eslint": "^10.0.0",
+    "typescript-eslint": "^8.0.0",
+    "prettier": "^3.0.0",
+    "eslint-config-prettier": "^10.0.0"
   },
   "dependencies": {},
   "keywords": [
     "discord",
+    "discord-api",
+    "discord-bot",
     "api",
     "gateway",
-    "ws",
-    "bot"
+    "bot",
+    "zero-dependency",
+    "typescript"
   ]
 }
