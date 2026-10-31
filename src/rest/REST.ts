@@ -10,10 +10,17 @@ export interface RESTOptions {
 
 export type HTTPMethod = "GET" | "POST" | "PUT" | "PATCH" | "DELETE";
 
+export interface RESTFile {
+  name: string;
+  data: Blob | Buffer | Uint8Array;
+  contentType?: string;
+}
+
 export interface RequestOptions {
   method: HTTPMethod;
   path: string;
   body?: unknown;
+  files?: RESTFile[];
   reason?: string;
   query?: Record<string, string | number | boolean | undefined>;
 }
@@ -75,7 +82,18 @@ export class REST {
     if (options.reason) headers["X-Audit-Log-Reason"] = encodeURIComponent(options.reason);
 
     let body: BodyInit | undefined;
-    if (options.body !== undefined) {
+    if (options.files?.length) {
+      // Content-Type is left unset: fetch computes the multipart boundary itself from the FormData instance.
+      const form = new FormData();
+      if (options.body !== undefined) {
+        form.append("payload_json", JSON.stringify(options.body));
+      }
+      options.files.forEach((file, index) => {
+        const blob = file.data instanceof Blob ? file.data : new Blob([file.data as BlobPart], { type: file.contentType });
+        form.append(`files[${index}]`, blob, file.name);
+      });
+      body = form;
+    } else if (options.body !== undefined) {
       headers["Content-Type"] = "application/json";
       body = JSON.stringify(options.body);
     }
@@ -132,16 +150,16 @@ export class REST {
     return this.request<T>({ method: "GET", path, query });
   }
 
-  public post<T = unknown>(path: string, body?: unknown, reason?: string): Promise<T> {
-    return this.request<T>({ method: "POST", path, body, reason });
+  public post<T = unknown>(path: string, body?: unknown, reason?: string, files?: RESTFile[]): Promise<T> {
+    return this.request<T>({ method: "POST", path, body, reason, files });
   }
 
   public put<T = unknown>(path: string, body?: unknown, reason?: string): Promise<T> {
     return this.request<T>({ method: "PUT", path, body, reason });
   }
 
-  public patch<T = unknown>(path: string, body?: unknown, reason?: string): Promise<T> {
-    return this.request<T>({ method: "PATCH", path, body, reason });
+  public patch<T = unknown>(path: string, body?: unknown, reason?: string, files?: RESTFile[]): Promise<T> {
+    return this.request<T>({ method: "PATCH", path, body, reason, files });
   }
 
   public delete<T = unknown>(path: string, reason?: string): Promise<T> {
