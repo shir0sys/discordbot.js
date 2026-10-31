@@ -1,5 +1,6 @@
 import { Channel, type APIChannel } from "./Channel";
 import { Message, type APIMessage, type MessagePayload, normalizeMessagePayload } from "./Message";
+import { ThreadMemberManager } from "../managers/ThreadMemberManager";
 import type { Client } from "../client/Client";
 
 export interface APIThreadMetadata {
@@ -26,6 +27,7 @@ export class ThreadChannel extends Channel {
   public autoArchiveDuration: number;
   public memberCount: number;
   public messageCount: number;
+  public readonly members: ThreadMemberManager;
 
   constructor(client: Client, data: APIThreadChannel) {
     super(client, data);
@@ -37,6 +39,7 @@ export class ThreadChannel extends Channel {
     this.autoArchiveDuration = data.thread_metadata?.auto_archive_duration ?? 1440;
     this.memberCount = data.member_count ?? 0;
     this.messageCount = data.message_count ?? 0;
+    this.members = new ThreadMemberManager(client, this.id);
   }
 
   public async send(payload: MessagePayload): Promise<Message> {
@@ -51,14 +54,6 @@ export class ThreadChannel extends Channel {
 
   public async leave(): Promise<void> {
     await this.client.rest.delete(`/channels/${this.id}/thread-members/@me`);
-  }
-
-  public async addMember(userId: string): Promise<void> {
-    await this.client.rest.put(`/channels/${this.id}/thread-members/${userId}`);
-  }
-
-  public async removeMember(userId: string): Promise<void> {
-    await this.client.rest.delete(`/channels/${this.id}/thread-members/${userId}`);
   }
 
   public async setArchived(archived = true, reason?: string): Promise<void> {
