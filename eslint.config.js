@@ -24,7 +24,7 @@ module.exports = tseslint.config(
     },
   },
   {
-    files: ["test/**/*.js", "example.js"],
+    files: ["test/**/*.js", "example.js", "examples/**/*.js"],
     languageOptions: {
       sourceType: "commonjs",
     },
