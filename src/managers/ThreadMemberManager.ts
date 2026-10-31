@@ -3,7 +3,10 @@ import { ThreadMember, type APIThreadMember } from "../structures/ThreadMember";
 import type { Client } from "../client/Client";
 
 export class ThreadMemberManager extends Collection<string, ThreadMember> {
-  constructor(private readonly client: Client, private readonly threadId: string) {
+  constructor(
+    private readonly client: Client,
+    private readonly threadId: string,
+  ) {
     super();
   }
 

@@ -18,10 +18,15 @@ export class SoundboardManager {
 }
 
 export class GuildSoundboardManager {
-  constructor(private readonly client: Client, private readonly guildId: string) {}
+  constructor(
+    private readonly client: Client,
+    private readonly guildId: string,
+  ) {}
 
   public async list(): Promise<SoundboardSound[]> {
-    const data = await this.client.rest.get<{ items: APISoundboardSound[] }>(`/guilds/${this.guildId}/soundboard-sounds`);
+    const data = await this.client.rest.get<{ items: APISoundboardSound[] }>(
+      `/guilds/${this.guildId}/soundboard-sounds`,
+    );
     return data.items.map((sound) => new SoundboardSound(this.client, sound));
   }
 

@@ -3,7 +3,10 @@ import type { APIGuild } from "../structures/Guild";
 import type { Client } from "../client/Client";
 
 export class GuildTemplateManager {
-  constructor(private readonly client: Client, private readonly guildId: string) {}
+  constructor(
+    private readonly client: Client,
+    private readonly guildId: string,
+  ) {}
 
   public async list(): Promise<GuildTemplate[]> {
     const data = await this.client.rest.get<APIGuildTemplate[]>(`/guilds/${this.guildId}/templates`);
@@ -21,6 +24,10 @@ export async function fetchGuildTemplate(client: Client, code: string): Promise<
   return new GuildTemplate(client, payload);
 }
 
-export async function createGuildFromTemplate(client: Client, code: string, data: { name: string; icon?: string }): Promise<APIGuild> {
+export async function createGuildFromTemplate(
+  client: Client,
+  code: string,
+  data: { name: string; icon?: string },
+): Promise<APIGuild> {
   return client.rest.post<APIGuild>(`/guilds/templates/${code}`, data);
 }

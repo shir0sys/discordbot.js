@@ -46,14 +46,22 @@ test("ModalBuilder serializes nested text input rows", () => {
   const json = new ModalBuilder()
     .setCustomId("m")
     .setTitle("Title")
-    .addComponents(new ActionRowBuilder().addComponents(new TextInputBuilder().setCustomId("field").setLabel("L").setStyle(TextInputStyle.Short)))
+    .addComponents(
+      new ActionRowBuilder().addComponents(
+        new TextInputBuilder().setCustomId("field").setLabel("L").setStyle(TextInputStyle.Short),
+      ),
+    )
     .toJSON();
   assert.equal(json.custom_id, "m");
   assert.equal(json.components[0].components[0].custom_id, "field");
 });
 
 test("SlashCommandBuilder.toJSON includes required string option", () => {
-  const json = new SlashCommandBuilder().setName("say").setDescription("d").addStringOption("text", "desc", { required: true }).toJSON();
+  const json = new SlashCommandBuilder()
+    .setName("say")
+    .setDescription("d")
+    .addStringOption("text", "desc", { required: true })
+    .toJSON();
   assert.equal(json.name, "say");
   assert.equal(json.options[0].type, ApplicationCommandOptionType.String);
   assert.equal(json.options[0].required, true);

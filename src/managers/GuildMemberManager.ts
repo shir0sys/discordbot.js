@@ -3,7 +3,10 @@ import { Member, type APIMember } from "../structures/Member";
 import type { Client } from "../client/Client";
 
 export class GuildMemberManager extends Collection<string, Member> {
-  constructor(private readonly client: Client, private readonly guildId: string) {
+  constructor(
+    private readonly client: Client,
+    private readonly guildId: string,
+  ) {
     super(null, 5000);
   }
 
@@ -43,7 +46,13 @@ export class GuildMemberManager extends Collection<string, Member> {
 
   public async edit(
     userId: string,
-    data: Partial<{ nick: string; roles: string[]; mute: boolean; deaf: boolean; communication_disabled_until: string | null }>,
+    data: Partial<{
+      nick: string;
+      roles: string[];
+      mute: boolean;
+      deaf: boolean;
+      communication_disabled_until: string | null;
+    }>,
     reason?: string,
   ): Promise<Member> {
     const updated = await this.client.rest.patch<APIMember & { user: { id: string } }>(
@@ -65,7 +74,9 @@ export class GuildMemberManager extends Collection<string, Member> {
    * GUILD_MEMBERS intent granting a full member list on GUILD_CREATE.
    * Routes the request to the shard actually responsible for this guild.
    */
-  public fetchViaGateway(options: { query?: string; limit?: number; userIds?: string[]; presences?: boolean; timeout?: number } = {}): Promise<Member[]> {
+  public fetchViaGateway(
+    options: { query?: string; limit?: number; userIds?: string[]; presences?: boolean; timeout?: number } = {},
+  ): Promise<Member[]> {
     const nonce = `${this.guildId}-${Date.now()}-${Math.random().toString(36).slice(2)}`;
     const shardCount = this.client.shards.length || 1;
     const shardId = Number((BigInt(this.guildId) >> 22n) % BigInt(shardCount));
@@ -78,7 +89,13 @@ export class GuildMemberManager extends Collection<string, Member> {
         reject(new Error("fetchViaGateway timed out"));
       }, options.timeout ?? 10000);
 
-      const onChunk = (chunk: { guildId: string; members: Member[]; chunkIndex: number; chunkCount: number; nonce: string | null }) => {
+      const onChunk = (chunk: {
+        guildId: string;
+        members: Member[];
+        chunkIndex: number;
+        chunkCount: number;
+        nonce: string | null;
+      }) => {
         if (chunk.nonce !== nonce) return;
         collected.push(...chunk.members);
         if (chunk.chunkIndex >= chunk.chunkCount - 1) {
@@ -91,8 +108,8 @@ export class GuildMemberManager extends Collection<string, Member> {
       this.client.on("guildMembersChunk", onChunk);
       gateway.requestGuildMembers({
         guildId: this.guildId,
-        query: options.userIds ? undefined : options.query ?? "",
-        limit: options.userIds ? undefined : options.limit ?? 0,
+        query: options.userIds ? undefined : (options.query ?? ""),
+        limit: options.userIds ? undefined : (options.limit ?? 0),
         userIds: options.userIds,
         presences: options.presences,
         nonce,

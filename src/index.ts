@@ -12,7 +12,12 @@ export { IntentsBitField } from "./util/Intents";
 export * from "./util/Constants";
 
 export { BitField, type BitFieldResolvable } from "./util/BitField";
-export { PermissionsBitField, PermissionFlags, computeChannelPermissions, type APIPermissionOverwrite } from "./util/Permissions";
+export {
+  PermissionsBitField,
+  PermissionFlags,
+  computeChannelPermissions,
+  type APIPermissionOverwrite,
+} from "./util/Permissions";
 export { UserFlagsBitField, UserFlagValues } from "./util/UserFlags";
 export * as Formatters from "./util/Formatters";
 export * as SnowflakeUtil from "./util/SnowflakeUtil";
@@ -36,7 +41,11 @@ export { GuildStickerManager } from "./managers/GuildStickerManager";
 export { SoundboardManager, GuildSoundboardManager } from "./managers/SoundboardManager";
 export { MonetizationManager } from "./managers/MonetizationManager";
 export { GuildTemplateManager, fetchGuildTemplate, createGuildFromTemplate } from "./managers/GuildTemplateManager";
-export { ApplicationCommandManager, type ApplicationCommandData, type CommandInput } from "./managers/ApplicationCommandManager";
+export {
+  ApplicationCommandManager,
+  type ApplicationCommandData,
+  type CommandInput,
+} from "./managers/ApplicationCommandManager";
 
 export { Base } from "./structures/Base";
 export { User, type APIUser } from "./structures/User";
@@ -55,7 +64,14 @@ export { MediaChannel } from "./structures/MediaChannel";
 export { DMChannel } from "./structures/DMChannel";
 export { ThreadChannel, type APIThreadChannel, type APIThreadMetadata } from "./structures/ThreadChannel";
 export { ThreadMember, type APIThreadMember } from "./structures/ThreadMember";
-export { Message, type APIMessage, type APIAttachment, type MessagePayload, type MessageCreateData, type ResolvedPayload } from "./structures/Message";
+export {
+  Message,
+  type APIMessage,
+  type APIAttachment,
+  type MessagePayload,
+  type MessageCreateData,
+  type ResolvedPayload,
+} from "./structures/Message";
 export { MessageReaction, type APIMessageReaction } from "./structures/MessageReaction";
 export { Emoji, GuildEmoji, type APIEmoji as APIEmojiData } from "./structures/Emoji";
 export { Sticker, type APISticker } from "./structures/Sticker";
@@ -78,11 +94,23 @@ export {
 export { SoundboardSound, type APISoundboardSound } from "./structures/SoundboardSound";
 export { SKU, type APISKU } from "./structures/SKU";
 export { Entitlement, type APIEntitlement } from "./structures/Entitlement";
-export { Presence, Activity, ActivityType, PresenceStatus, type APIPresence, type APIActivity } from "./structures/Presence";
+export {
+  Presence,
+  Activity,
+  ActivityType,
+  PresenceStatus,
+  type APIPresence,
+  type APIActivity,
+} from "./structures/Presence";
 export { Invite, type APIInvite, type PartialInvite } from "./structures/Invite";
 export { GuildBan, type APIBan } from "./structures/GuildBan";
 
-export { Interaction, type APIInteraction, type APIInteractionData, type APIInteractionOption } from "./structures/Interaction";
+export {
+  Interaction,
+  type APIInteraction,
+  type APIInteractionData,
+  type APIInteractionOption,
+} from "./structures/Interaction";
 export { CommandInteraction } from "./structures/CommandInteraction";
 export { ContextMenuCommandInteraction } from "./structures/ContextMenuCommandInteraction";
 export { MessageComponentInteraction } from "./structures/MessageComponentInteraction";

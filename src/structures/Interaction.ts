@@ -85,7 +85,11 @@ export class Interaction extends Base {
     return this.type === InteractionType.ApplicationCommandAutocomplete;
   }
 
-  protected async callback(type: InteractionResponseType, data?: unknown, files?: import("../rest/REST").RESTFile[]): Promise<void> {
+  protected async callback(
+    type: InteractionResponseType,
+    data?: unknown,
+    files?: import("../rest/REST").RESTFile[],
+  ): Promise<void> {
     if (this.replied) throw new Error("Interaction has already received a response");
     this.replied = true;
     await this.client.rest.post(`/interactions/${this.id}/${this.token}/callback`, { type, data }, undefined, files);
@@ -105,7 +109,12 @@ export class Interaction extends Base {
 
   public async editReply(payload: MessagePayload): Promise<void> {
     const { body, files } = normalizeMessagePayload(payload);
-    await this.client.rest.patch(`/webhooks/${this.applicationId}/${this.token}/messages/@original`, body, undefined, files);
+    await this.client.rest.patch(
+      `/webhooks/${this.applicationId}/${this.token}/messages/@original`,
+      body,
+      undefined,
+      files,
+    );
   }
 
   public async followUp(payload: MessagePayload): Promise<void> {

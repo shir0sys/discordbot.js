@@ -62,7 +62,11 @@ export async function refreshAccessToken(options: RefreshTokenOptions): Promise<
 }
 
 export async function revokeToken(options: { clientId: string; clientSecret: string; token: string }): Promise<void> {
-  const body = new URLSearchParams({ client_id: options.clientId, client_secret: options.clientSecret, token: options.token });
+  const body = new URLSearchParams({
+    client_id: options.clientId,
+    client_secret: options.clientSecret,
+    token: options.token,
+  });
   const response = await fetch(`${OAUTH2_BASE_URL}/token/revoke`, {
     method: "POST",
     headers: { "Content-Type": "application/x-www-form-urlencoded" },

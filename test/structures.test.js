@@ -51,7 +51,12 @@ test("AuditLogEntry.getChange retrieves a typed old/new pair by key", () => {
 
 test("createChannel dispatches category/forum/stage types to their dedicated classes", () => {
   const category = createChannel(fakeClient, { id: "c1", type: ChannelType.GuildCategory, guild_id: "g1" });
-  const forum = createChannel(fakeClient, { id: "f1", type: ChannelType.GuildForum, guild_id: "g1", available_tags: [] });
+  const forum = createChannel(fakeClient, {
+    id: "f1",
+    type: ChannelType.GuildForum,
+    guild_id: "g1",
+    available_tags: [],
+  });
   const stage = createChannel(fakeClient, { id: "s1", type: ChannelType.GuildStageVoice, guild_id: "g1" });
 
   assert.equal(category.constructor.name, "CategoryChannel");

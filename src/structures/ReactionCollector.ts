@@ -19,7 +19,11 @@ export class ReactionCollector extends Collector<string, CollectedReaction> {
     });
   };
 
-  constructor(private readonly client: Client, private readonly messageId: string, options: CollectorOptions<CollectedReaction> = {}) {
+  constructor(
+    private readonly client: Client,
+    private readonly messageId: string,
+    options: CollectorOptions<CollectedReaction> = {},
+  ) {
     super(options);
     this.client.on("messageReactionAdd", this.onReaction);
     this.once("end", () => this.client.off("messageReactionAdd", this.onReaction));

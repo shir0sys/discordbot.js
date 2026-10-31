@@ -5,7 +5,10 @@ export class AttachmentBuilder {
   private description?: string;
   private spoiler = false;
 
-  constructor(private readonly data: Buffer | Uint8Array | Blob, name: string) {
+  constructor(
+    private readonly data: Buffer | Uint8Array | Blob,
+    name: string,
+  ) {
     this.name = name;
   }
 

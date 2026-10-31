@@ -4,11 +4,17 @@ import type { RESTFile } from "../rest/REST";
 import type { Client } from "../client/Client";
 
 export class GuildStickerManager extends Collection<string, Sticker> {
-  constructor(private readonly client: Client, private readonly guildId: string) {
+  constructor(
+    private readonly client: Client,
+    private readonly guildId: string,
+  ) {
     super();
   }
 
-  public async create(data: { name: string; description: string; tags: string; file: RESTFile }, reason?: string): Promise<Sticker> {
+  public async create(
+    data: { name: string; description: string; tags: string; file: RESTFile },
+    reason?: string,
+  ): Promise<Sticker> {
     const payload = await this.client.rest.post<APISticker>(
       `/guilds/${this.guildId}/stickers`,
       { name: data.name, description: data.description, tags: data.tags },

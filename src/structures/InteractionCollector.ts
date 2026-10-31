@@ -16,7 +16,10 @@ export class InteractionCollector extends Collector<string, MessageComponentInte
 
   private readonly messageId?: string;
 
-  constructor(private readonly client: Client, options: InteractionCollectorOptions = {}) {
+  constructor(
+    private readonly client: Client,
+    options: InteractionCollectorOptions = {},
+  ) {
     super(options);
     this.messageId = options.messageId;
     this.client.on("interactionCreate", this.onInteraction);

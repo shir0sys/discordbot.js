@@ -19,7 +19,12 @@ function baseInteraction(commandData) {
 test("getOption reads flat (non-subcommand) options", () => {
   const interaction = new CommandInteraction(
     fakeClient,
-    baseInteraction({ id: "c1", name: "say", type: 1, options: [{ name: "text", type: ApplicationCommandOptionType.String, value: "hi" }] }),
+    baseInteraction({
+      id: "c1",
+      name: "say",
+      type: 1,
+      options: [{ name: "text", type: ApplicationCommandOptionType.String, value: "hi" }],
+    }),
   );
   assert.equal(interaction.getOption("text"), "hi");
   assert.equal(interaction.subcommand, null);

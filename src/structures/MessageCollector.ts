@@ -7,7 +7,11 @@ export class MessageCollector extends Collector<string, Message> {
     if (message.channelId === this.channelId) this.handleCollect(message);
   };
 
-  constructor(private readonly client: Client, private readonly channelId: string, options: CollectorOptions<Message> = {}) {
+  constructor(
+    private readonly client: Client,
+    private readonly channelId: string,
+    options: CollectorOptions<Message> = {},
+  ) {
     super(options);
     this.client.on("messageCreate", this.onMessage);
     this.once("end", () => this.client.off("messageCreate", this.onMessage));

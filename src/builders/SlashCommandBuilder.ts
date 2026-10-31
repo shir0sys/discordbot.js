@@ -48,7 +48,12 @@ export class SlashCommandBuilder {
     return this;
   }
 
-  private addOption(type: ApplicationCommandOptionType, name: string, description: string, config: OptionConfig = {}): this {
+  private addOption(
+    type: ApplicationCommandOptionType,
+    name: string,
+    description: string,
+    config: OptionConfig = {},
+  ): this {
     this.options.push({
       type,
       name,
@@ -119,9 +124,17 @@ export class SlashCommandBuilder {
 export class SlashCommandSubcommandBuilder {
   private options: SlashCommandOptionData[] = [];
 
-  constructor(private readonly name: string, private readonly description: string) {}
+  constructor(
+    private readonly name: string,
+    private readonly description: string,
+  ) {}
 
-  private addOption(type: ApplicationCommandOptionType, name: string, description: string, config: OptionConfig = {}): this {
+  private addOption(
+    type: ApplicationCommandOptionType,
+    name: string,
+    description: string,
+    config: OptionConfig = {},
+  ): this {
     this.options.push({
       type,
       name,

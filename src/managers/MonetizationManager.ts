@@ -16,7 +16,9 @@ export class MonetizationManager {
     return data.map((sku) => new SKU(sku));
   }
 
-  public async fetchEntitlements(options: { userId?: string; guildId?: string; skuIds?: string[] } = {}): Promise<Entitlement[]> {
+  public async fetchEntitlements(
+    options: { userId?: string; guildId?: string; skuIds?: string[] } = {},
+  ): Promise<Entitlement[]> {
     const data = await this.client.rest.get<APIEntitlement[]>(`/applications/${this.appId()}/entitlements`, {
       user_id: options.userId,
       guild_id: options.guildId,

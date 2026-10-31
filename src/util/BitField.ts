@@ -1,15 +1,14 @@
 export type BitFieldResolvable<Flags extends Record<string, bigint>> =
-  | bigint
-  | number
-  | (keyof Flags)[]
-  | bigint[]
-  | BitField<Flags>;
+  bigint | number | (keyof Flags)[] | bigint[] | BitField<Flags>;
 
 /** Generic bigint-backed bitfield. Permission/flag values can exceed 32 bits, so bigint is used throughout rather than number. */
 export class BitField<Flags extends Record<string, bigint>> {
   public bitfield: bigint;
 
-  constructor(protected readonly flags: Flags, bits: BitFieldResolvable<Flags> = 0n) {
+  constructor(
+    protected readonly flags: Flags,
+    bits: BitFieldResolvable<Flags> = 0n,
+  ) {
     this.bitfield = this.resolve(bits);
   }
 

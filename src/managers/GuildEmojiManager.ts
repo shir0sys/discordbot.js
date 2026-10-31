@@ -3,7 +3,10 @@ import { GuildEmoji, type APIEmoji } from "../structures/Emoji";
 import type { Client } from "../client/Client";
 
 export class GuildEmojiManager extends Collection<string, GuildEmoji> {
-  constructor(private readonly client: Client, private readonly guildId: string) {
+  constructor(
+    private readonly client: Client,
+    private readonly guildId: string,
+  ) {
     super();
   }
 
@@ -18,10 +21,12 @@ export class GuildEmojiManager extends Collection<string, GuildEmoji> {
   public async fetchAll(): Promise<GuildEmoji[]> {
     const data = await this.client.rest.get<APIEmoji[]>(`/guilds/${this.guildId}/emojis`);
     this.clear();
-    return data.filter((e) => e.id).map((raw) => {
-      const emoji = new GuildEmoji(this.client, this.guildId, raw);
-      this.set(emoji.id!, emoji);
-      return emoji;
-    });
+    return data
+      .filter((e) => e.id)
+      .map((raw) => {
+        const emoji = new GuildEmoji(this.client, this.guildId, raw);
+        this.set(emoji.id!, emoji);
+        return emoji;
+      });
   }
 }

@@ -4,7 +4,10 @@ import { createChannel } from "../structures/ChannelFactory";
 import type { Client } from "../client/Client";
 
 export class GuildChannelManager extends Collection<string, Channel> {
-  constructor(private readonly client: Client, private readonly guildId: string) {
+  constructor(
+    private readonly client: Client,
+    private readonly guildId: string,
+  ) {
     super();
   }
 

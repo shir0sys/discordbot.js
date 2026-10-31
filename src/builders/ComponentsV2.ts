@@ -40,7 +40,12 @@ export class ThumbnailBuilder implements JSONEncodable {
   }
 
   public toJSON(): object {
-    return { type: ComponentType.Thumbnail, media: { url: this.url }, description: this.description, spoiler: this.spoiler };
+    return {
+      type: ComponentType.Thumbnail,
+      media: { url: this.url },
+      description: this.description,
+      spoiler: this.spoiler,
+    };
   }
 }
 
@@ -61,7 +66,11 @@ export class MediaGalleryBuilder implements JSONEncodable {
   public toJSON(): object {
     return {
       type: ComponentType.MediaGallery,
-      items: this.items.map((item) => ({ media: { url: item.url }, description: item.description, spoiler: item.spoiler })),
+      items: this.items.map((item) => ({
+        media: { url: item.url },
+        description: item.description,
+        spoiler: item.spoiler,
+      })),
     };
   }
 }

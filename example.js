@@ -20,12 +20,7 @@ const {
 } = require("./dist");
 
 const client = new Client({
-  intents: [
-    IntentBits.Guilds,
-    IntentBits.GuildMessages,
-    IntentBits.GuildMessageReactions,
-    IntentBits.MessageContent,
-  ],
+  intents: [IntentBits.Guilds, IntentBits.GuildMessages, IntentBits.GuildMessageReactions, IntentBits.MessageContent],
 });
 
 const pingCommand = new SlashCommandBuilder().setName("ping").setDescription("Replies with Pong!");
@@ -49,7 +44,14 @@ const userInfoContextMenu = new ContextMenuCommandBuilder().setName("User info")
 
 client.on("ready", async () => {
   console.log(`Logged in as ${client.user.tag}`);
-  await client.application.set([pingCommand, sayCommand, panelCommand, v2Command, feedbackCommand, userInfoContextMenu]);
+  await client.application.set([
+    pingCommand,
+    sayCommand,
+    panelCommand,
+    v2Command,
+    feedbackCommand,
+    userInfoContextMenu,
+  ]);
 });
 
 client.on("guildCreate", (guild) => {
@@ -70,7 +72,10 @@ client.on("messageCreate", async (message) => {
       .setTitle("Example embed")
       .setDescription("Built with EmbedBuilder")
       .setColor(0x5865f2)
-      .addFields({ name: "Field 1", value: "Value 1", inline: true }, { name: "Field 2", value: "Value 2", inline: true })
+      .addFields(
+        { name: "Field 1", value: "Value 1", inline: true },
+        { name: "Field 2", value: "Value 2", inline: true },
+      )
       .setFooter("discordbot.js")
       .setTimestamp();
 

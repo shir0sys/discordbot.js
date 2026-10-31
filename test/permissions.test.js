@@ -38,6 +38,12 @@ test("computeChannelPermissions applies everyone overwrite then role overwrite t
 
 test("computeChannelPermissions short-circuits to All when base has Administrator", () => {
   const base = new PermissionsBitField(PermissionsBitField.Flags.Administrator);
-  const result = computeChannelPermissions(base, [{ id: "x", type: 1, allow: "0", deny: String(PermissionsBitField.All) }], "everyone", "x", []);
+  const result = computeChannelPermissions(
+    base,
+    [{ id: "x", type: 1, allow: "0", deny: String(PermissionsBitField.All) }],
+    "everyone",
+    "x",
+    [],
+  );
   assert.equal(result.bitfield, PermissionsBitField.All);
 });
