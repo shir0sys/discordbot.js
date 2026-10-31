@@ -99,3 +99,68 @@ export enum InteractionResponseType {
   ApplicationCommandAutocompleteResult = 8,
   Modal = 9,
 }
+
+export enum ComponentType {
+  ActionRow = 1,
+  Button = 2,
+  StringSelect = 3,
+  TextInput = 4,
+  UserSelect = 5,
+  RoleSelect = 6,
+  MentionableSelect = 7,
+  ChannelSelect = 8,
+  Section = 9,
+  TextDisplay = 10,
+  Thumbnail = 11,
+  MediaGallery = 12,
+  File = 13,
+  Separator = 14,
+  Container = 17,
+}
+
+export enum ButtonStyle {
+  Primary = 1,
+  Secondary = 2,
+  Success = 3,
+  Danger = 4,
+  Link = 5,
+  Premium = 6,
+}
+
+export enum TextInputStyle {
+  Short = 1,
+  Paragraph = 2,
+}
+
+export enum ApplicationCommandOptionType {
+  SubCommand = 1,
+  SubCommandGroup = 2,
+  String = 3,
+  Integer = 4,
+  Boolean = 5,
+  User = 6,
+  Channel = 7,
+  Role = 8,
+  Mentionable = 9,
+  Number = 10,
+  Attachment = 11,
+}
+
+export enum ApplicationCommandType {
+  ChatInput = 1,
+  User = 2,
+  Message = 3,
+}
+
+export enum MessageFlags {
+  Crossposted = 1 << 0,
+  IsCrosspost = 1 << 1,
+  SuppressEmbeds = 1 << 2,
+  SourceMessageDeleted = 1 << 3,
+  Urgent = 1 << 4,
+  HasThread = 1 << 5,
+  Ephemeral = 1 << 6,
+  Loading = 1 << 7,
+  SuppressNotifications = 1 << 12,
+  IsComponentsV2 = 1 << 15,
+}
