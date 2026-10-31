@@ -7,7 +7,11 @@ export class GuildManager extends CachedManager<string, Guild> {
     super(client);
   }
 
-  public fetch(id: string): Promise<Guild> {
+  public fetch(id: string, options: { force?: boolean } = {}): Promise<Guild> {
+    if (!options.force) {
+      const cached = this.get(id);
+      if (cached) return Promise.resolve(cached);
+    }
     return this.fetchAndCache<APIGuild>(id, `/guilds/${id}`, (data) => new Guild(this.client, data));
   }
 

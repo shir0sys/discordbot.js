@@ -16,7 +16,11 @@ export class GuildMemberManager extends Collection<string, Member> {
     return member;
   }
 
-  public async fetch(userId: string): Promise<Member> {
+  public async fetch(userId: string, options: { force?: boolean } = {}): Promise<Member> {
+    if (!options.force) {
+      const cached = this.get(userId);
+      if (cached) return cached;
+    }
     const data = await this.client.rest.get<APIMember & { user: { id: string } }>(
       `/guilds/${this.guildId}/members/${userId}`,
     );

@@ -7,9 +7,11 @@ export class UserManager extends CachedManager<string, User> {
     super(client, 10000);
   }
 
-  public async fetch(id: string): Promise<User> {
-    const cached = this.get(id);
-    if (cached) return cached;
+  public async fetch(id: string, options: { force?: boolean } = {}): Promise<User> {
+    if (!options.force) {
+      const cached = this.get(id);
+      if (cached) return cached;
+    }
     return this.fetchAndCache<APIUser>(id, `/users/${id}`, (data) => new User(this.client, data));
   }
 }
