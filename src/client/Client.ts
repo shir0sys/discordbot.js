@@ -25,11 +25,12 @@ import { ContextMenuCommandInteraction } from "../structures/ContextMenuCommandI
 import { MessageComponentInteraction } from "../structures/MessageComponentInteraction";
 import { ModalSubmitInteraction } from "../structures/ModalSubmitInteraction";
 import { AutocompleteInteraction } from "../structures/AutocompleteInteraction";
-import { ApplicationCommandType, InteractionType } from "../util/Constants";
+import { ApplicationCommandType, GatewayOpcodes, InteractionType } from "../util/Constants";
 import { ShardClientUtil } from "../sharding/ShardClientUtil";
 import { GuildBan, type APIBan } from "../structures/GuildBan";
 import { Invite, type APIInvite, type PartialInvite } from "../structures/Invite";
 import { Presence, type APIPresence } from "../structures/Presence";
+import { VoiceConnection } from "../voice/VoiceConnection";
 import type { APIChannel } from "../structures/Channel";
 
 export interface TypingStartData {
@@ -168,6 +169,7 @@ export class Client extends EventEmitter {
   public readonly soundboard: SoundboardManager;
   public readonly intents: IntentsBitField;
   public readonly shard: ShardClientUtil;
+  public readonly voiceConnections = new Map<string, VoiceConnection>();
 
   // Constructed lazily in login(): the REST/Gateway clients need the bot
   // token up front and ClientOptions alone doesn't carry one.
@@ -204,6 +206,88 @@ export class Client extends EventEmitter {
 
   public get shards(): readonly Gateway[] {
     return this._gateways;
+  }
+
+  private shardFor(guildId: string): Gateway {
+    const shardCount = this._gateways.length || 1;
+    const shardId = Number((BigInt(guildId) >> 22n) % BigInt(shardCount));
+    return this._gateways[shardId] ?? this.gateway;
+  }
+
+  /**
+   * Joins a voice channel: sends the Voice State Update (opcode 4) on the
+   * shard responsible for the guild, waits for the matching
+   * VOICE_STATE_UPDATE (our own session id) and VOICE_SERVER_UPDATE
+   * (token + endpoint) dispatches, then hands both to a VoiceConnection.
+   */
+  public async joinVoiceChannel(options: {
+    guildId: string;
+    channelId: string;
+    selfMute?: boolean;
+    selfDeaf?: boolean;
+    timeout?: number;
+  }): Promise<VoiceConnection> {
+    if (!this.user) throw new Error("Cannot join a voice channel before the client is ready");
+
+    const { guildId, channelId, selfMute = false, selfDeaf = false, timeout = 10000 } = options;
+
+    const statePromise = new Promise<VoiceState>((resolve) => {
+      const onState = (state: VoiceState) => {
+        if (state.guildId === guildId && state.userId === this.user!.id && state.channelId) {
+          this.off("voiceStateUpdate", onState);
+          resolve(state);
+        }
+      };
+      this.on("voiceStateUpdate", onState);
+    });
+
+    const serverPromise = new Promise<{ token: string; endpoint: string }>((resolve) => {
+      const onServer = (data: Record<string, any>) => {
+        if (data.guild_id === guildId) {
+          this.off("voiceServerUpdate", onServer);
+          resolve({ token: data.token, endpoint: data.endpoint });
+        }
+      };
+      this.on("voiceServerUpdate", onServer);
+    });
+
+    this.shardFor(guildId).send(GatewayOpcodes.VoiceStateUpdate, {
+      guild_id: guildId,
+      channel_id: channelId,
+      self_mute: selfMute,
+      self_deaf: selfDeaf,
+    });
+
+    const timeoutPromise = new Promise<never>((_, reject) => {
+      setTimeout(() => reject(new Error("Timed out waiting for voice server info")), timeout).unref?.();
+    });
+
+    const [state, server] = await Promise.all([
+      Promise.race([statePromise, timeoutPromise]),
+      Promise.race([serverPromise, timeoutPromise]),
+    ]);
+
+    const connection = new VoiceConnection({
+      guildId,
+      channelId,
+      userId: this.user.id,
+      sessionId: state.sessionId,
+      token: server.token,
+      endpoint: server.endpoint,
+    });
+    this.voiceConnections.set(guildId, connection);
+    return connection;
+  }
+
+  public leaveVoiceChannel(guildId: string): void {
+    this.shardFor(guildId).send(GatewayOpcodes.VoiceStateUpdate, {
+      guild_id: guildId,
+      channel_id: null,
+      self_mute: false,
+      self_deaf: false,
+    });
+    this.voiceConnections.get(guildId)?.destroy();
+    this.voiceConnections.delete(guildId);
   }
 
   public async login(token: string): Promise<void> {
