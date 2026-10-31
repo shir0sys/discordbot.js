@@ -6,6 +6,14 @@ import type { JSONEncodable } from "../builders/Components";
 import type { ModalBuilder } from "../builders/Modal";
 import type { Client } from "../client/Client";
 
+export interface APIInteractionOption {
+  name: string;
+  value?: string | number | boolean;
+  type: number;
+  focused?: boolean;
+  options?: APIInteractionOption[];
+}
+
 export interface APIInteractionData {
   id: string;
   name: string;
@@ -13,8 +21,9 @@ export interface APIInteractionData {
   custom_id?: string;
   component_type?: number;
   values?: string[];
-  options?: { name: string; value?: string | number | boolean; type: number; focused?: boolean }[];
+  options?: APIInteractionOption[];
   components?: { components: { custom_id: string; value: string }[] }[];
+  target_id?: string;
 }
 
 export interface APIInteraction {
@@ -76,14 +85,15 @@ export class Interaction extends Base {
     return this.type === InteractionType.ApplicationCommandAutocomplete;
   }
 
-  protected async callback(type: InteractionResponseType, data?: unknown): Promise<void> {
+  protected async callback(type: InteractionResponseType, data?: unknown, files?: import("../rest/REST").RESTFile[]): Promise<void> {
     if (this.replied) throw new Error("Interaction has already received a response");
     this.replied = true;
-    await this.client.rest.post(`/interactions/${this.id}/${this.token}/callback`, { type, data });
+    await this.client.rest.post(`/interactions/${this.id}/${this.token}/callback`, { type, data }, undefined, files);
   }
 
   public async reply(payload: MessagePayload): Promise<void> {
-    await this.callback(InteractionResponseType.ChannelMessageWithSource, normalizeMessagePayload(payload));
+    const { body, files } = normalizeMessagePayload(payload);
+    await this.callback(InteractionResponseType.ChannelMessageWithSource, body, files);
   }
 
   public async deferReply(ephemeral = false): Promise<void> {
@@ -94,19 +104,19 @@ export class Interaction extends Base {
   }
 
   public async editReply(payload: MessagePayload): Promise<void> {
-    await this.client.rest.patch(
-      `/webhooks/${this.applicationId}/${this.token}/messages/@original`,
-      normalizeMessagePayload(payload),
-    );
+    const { body, files } = normalizeMessagePayload(payload);
+    await this.client.rest.patch(`/webhooks/${this.applicationId}/${this.token}/messages/@original`, body, undefined, files);
   }
 
   public async followUp(payload: MessagePayload): Promise<void> {
-    await this.client.rest.post(`/webhooks/${this.applicationId}/${this.token}`, normalizeMessagePayload(payload));
+    const { body, files } = normalizeMessagePayload(payload);
+    await this.client.rest.post(`/webhooks/${this.applicationId}/${this.token}`, body, undefined, files);
   }
 
   /** Updates the message the component is attached to (component interactions only). */
   public async update(payload: MessagePayload): Promise<void> {
-    await this.callback(InteractionResponseType.UpdateMessage, normalizeMessagePayload(payload));
+    const { body, files } = normalizeMessagePayload(payload);
+    await this.callback(InteractionResponseType.UpdateMessage, body, files);
   }
 
   public async deferUpdate(): Promise<void> {
