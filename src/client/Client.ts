@@ -231,24 +231,34 @@ export class Client extends EventEmitter {
 
     const { guildId, channelId, selfMute = false, selfDeaf = false, timeout = 10000 } = options;
 
+    // A stale connection left over from a previous attempt that timed out
+    // keeps its own voice gateway socket (and the session_id/token it was
+    // identified with) alive. Re-identifying a fresh VoiceConnection while
+    // that old session is still open is a likely cause of Discord closing
+    // the new one with 4006 (session no longer valid) — clear it first.
+    this.voiceConnections.get(guildId)?.destroy();
+    this.voiceConnections.delete(guildId);
+
+    const cleanups: (() => void)[] = [];
+
     const statePromise = new Promise<VoiceState>((resolve) => {
       const onState = (state: VoiceState) => {
-        if (state.guildId === guildId && state.userId === this.user!.id && state.channelId) {
-          this.off("voiceStateUpdate", onState);
+        if (state.guildId === guildId && state.userId === this.user!.id && state.channelId === channelId) {
           resolve(state);
         }
       };
       this.on("voiceStateUpdate", onState);
+      cleanups.push(() => this.off("voiceStateUpdate", onState));
     });
 
     const serverPromise = new Promise<{ token: string; endpoint: string }>((resolve) => {
       const onServer = (data: Record<string, any>) => {
         if (data.guild_id === guildId) {
-          this.off("voiceServerUpdate", onServer);
           resolve({ token: data.token, endpoint: data.endpoint });
         }
       };
       this.on("voiceServerUpdate", onServer);
+      cleanups.push(() => this.off("voiceServerUpdate", onServer));
     });
 
     this.shardFor(guildId).send(GatewayOpcodes.VoiceStateUpdate, {
@@ -262,10 +272,16 @@ export class Client extends EventEmitter {
       setTimeout(() => reject(new Error("Timed out waiting for voice server info")), timeout).unref?.();
     });
 
-    const [state, server] = await Promise.all([
-      Promise.race([statePromise, timeoutPromise]),
-      Promise.race([serverPromise, timeoutPromise]),
-    ]);
+    let state: VoiceState;
+    let server: { token: string; endpoint: string };
+    try {
+      [state, server] = await Promise.all([
+        Promise.race([statePromise, timeoutPromise]),
+        Promise.race([serverPromise, timeoutPromise]),
+      ]);
+    } finally {
+      cleanups.forEach((cleanup) => cleanup());
+    }
 
     const connection = new VoiceConnection({
       guildId,
