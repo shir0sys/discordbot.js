@@ -8,6 +8,10 @@ export interface APIRole {
   position: number;
   permissions: string;
   managed: boolean;
+  hoist?: boolean;
+  mentionable?: boolean;
+  icon?: string | null;
+  unicode_emoji?: string | null;
 }
 
 export class Role extends Base {
@@ -18,6 +22,10 @@ export class Role extends Base {
   public position: number;
   public permissions: bigint;
   public managed: boolean;
+  public hoist: boolean;
+  public mentionable: boolean;
+  public icon: string | null;
+  public unicodeEmoji: string | null;
 
   constructor(client: Client, guildId: string, data: APIRole) {
     super(client);
@@ -28,6 +36,10 @@ export class Role extends Base {
     this.position = data.position;
     this.permissions = BigInt(data.permissions);
     this.managed = data.managed;
+    this.hoist = data.hoist ?? false;
+    this.mentionable = data.mentionable ?? false;
+    this.icon = data.icon ?? null;
+    this.unicodeEmoji = data.unicode_emoji ?? null;
   }
 
   public toString(): string {
