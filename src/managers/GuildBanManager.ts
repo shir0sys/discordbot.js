@@ -1,22 +1,17 @@
-import { User, type APIUser } from "../structures/User";
+import { GuildBan, type APIBan } from "../structures/GuildBan";
 import type { Client } from "../client/Client";
-
-export interface APIBan {
-  reason: string | null;
-  user: APIUser;
-}
 
 export class GuildBanManager {
   constructor(private readonly client: Client, private readonly guildId: string) {}
 
-  public async fetch(userId: string): Promise<{ user: User; reason: string | null }> {
+  public async fetch(userId: string): Promise<GuildBan> {
     const data = await this.client.rest.get<APIBan>(`/guilds/${this.guildId}/bans/${userId}`);
-    return { user: new User(this.client, data.user), reason: data.reason };
+    return new GuildBan(this.client, this.guildId, data);
   }
 
-  public async list(): Promise<{ user: User; reason: string | null }[]> {
+  public async list(): Promise<GuildBan[]> {
     const data = await this.client.rest.get<APIBan[]>(`/guilds/${this.guildId}/bans`);
-    return data.map((ban) => ({ user: new User(this.client, ban.user), reason: ban.reason }));
+    return data.map((ban) => new GuildBan(this.client, this.guildId, ban));
   }
 
   public async create(userId: string, options: { deleteMessageSeconds?: number; reason?: string } = {}): Promise<void> {
