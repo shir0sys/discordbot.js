@@ -58,4 +58,45 @@ export class GuildMemberManager extends Collection<string, Member> {
     const until = durationMs === null ? null : new Date(Date.now() + durationMs).toISOString();
     return this.edit(userId, { communication_disabled_until: until }, reason);
   }
+
+  /**
+   * Fetches members over the gateway (opcode 8) instead of REST — the only
+   * way to bulk-fetch members of a large guild without the privileged
+   * GUILD_MEMBERS intent granting a full member list on GUILD_CREATE.
+   * Routes the request to the shard actually responsible for this guild.
+   */
+  public fetchViaGateway(options: { query?: string; limit?: number; userIds?: string[]; presences?: boolean; timeout?: number } = {}): Promise<Member[]> {
+    const nonce = `${this.guildId}-${Date.now()}-${Math.random().toString(36).slice(2)}`;
+    const shardCount = this.client.shards.length || 1;
+    const shardId = Number((BigInt(this.guildId) >> 22n) % BigInt(shardCount));
+    const gateway = this.client.shards[shardId] ?? this.client.gateway;
+
+    return new Promise((resolve, reject) => {
+      const collected: Member[] = [];
+      const timer = setTimeout(() => {
+        this.client.off("guildMembersChunk", onChunk);
+        reject(new Error("fetchViaGateway timed out"));
+      }, options.timeout ?? 10000);
+
+      const onChunk = (chunk: { guildId: string; members: Member[]; chunkIndex: number; chunkCount: number; nonce: string | null }) => {
+        if (chunk.nonce !== nonce) return;
+        collected.push(...chunk.members);
+        if (chunk.chunkIndex >= chunk.chunkCount - 1) {
+          clearTimeout(timer);
+          this.client.off("guildMembersChunk", onChunk);
+          resolve(collected);
+        }
+      };
+
+      this.client.on("guildMembersChunk", onChunk);
+      gateway.requestGuildMembers({
+        guildId: this.guildId,
+        query: options.userIds ? undefined : options.query ?? "",
+        limit: options.userIds ? undefined : options.limit ?? 0,
+        userIds: options.userIds,
+        presences: options.presences,
+        nonce,
+      });
+    });
+  }
 }

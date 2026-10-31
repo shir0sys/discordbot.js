@@ -27,7 +27,33 @@ import { ModalSubmitInteraction } from "../structures/ModalSubmitInteraction";
 import { AutocompleteInteraction } from "../structures/AutocompleteInteraction";
 import { ApplicationCommandType, InteractionType } from "../util/Constants";
 import { ShardClientUtil } from "../sharding/ShardClientUtil";
+import { GuildBan, type APIBan } from "../structures/GuildBan";
+import { Invite, type APIInvite, type PartialInvite } from "../structures/Invite";
+import { Presence, type APIPresence } from "../structures/Presence";
 import type { APIChannel } from "../structures/Channel";
+
+export interface TypingStartData {
+  channelId: string;
+  guildId: string | null;
+  userId: string;
+  timestamp: number;
+}
+
+export interface PollVoteData {
+  userId: string;
+  channelId: string;
+  messageId: string;
+  guildId: string | null;
+  answerId: number;
+}
+
+export interface GuildMembersChunkData {
+  guildId: string;
+  members: Member[];
+  chunkIndex: number;
+  chunkCount: number;
+  nonce: string | null;
+}
 
 export interface ClientOptions {
   intents: IntentResolvable;
@@ -55,16 +81,17 @@ type ClientEvents = {
   messageReactionRemove: [Record<string, unknown>];
   messageReactionRemoveAll: [Record<string, unknown>];
   messageReactionRemoveEmoji: [Record<string, unknown>];
-  messagePollVoteAdd: [Record<string, unknown>];
-  messagePollVoteRemove: [Record<string, unknown>];
+  messagePollVoteAdd: [PollVoteData];
+  messagePollVoteRemove: [PollVoteData];
   guildCreate: [Guild];
   guildUpdate: [Guild];
   guildDelete: [{ id: string; unavailable: boolean }];
   guildMemberAdd: [Member];
   guildMemberRemove: [{ guildId: string; user: User }];
   guildMemberUpdate: [Member];
-  guildBanAdd: [{ guildId: string; user: User }];
-  guildBanRemove: [{ guildId: string; user: User }];
+  guildMembersChunk: [GuildMembersChunkData];
+  guildBanAdd: [GuildBan];
+  guildBanRemove: [GuildBan];
   roleCreate: [Role];
   roleUpdate: [Role];
   roleDelete: [{ guildId: string; roleId: string }];
@@ -75,14 +102,14 @@ type ClientEvents = {
   threadCreate: [import("../structures/ThreadChannel").ThreadChannel];
   threadUpdate: [import("../structures/ThreadChannel").ThreadChannel];
   threadDelete: [{ id: string; guildId: string }];
-  presenceUpdate: [Record<string, unknown>];
-  typingStart: [Record<string, unknown>];
+  presenceUpdate: [Presence];
+  typingStart: [TypingStartData];
   userUpdate: [User];
   voiceStateUpdate: [VoiceState];
   voiceServerUpdate: [Record<string, unknown>];
   webhooksUpdate: [{ guildId: string; channelId: string }];
-  inviteCreate: [Record<string, unknown>];
-  inviteDelete: [Record<string, unknown>];
+  inviteCreate: [Invite];
+  inviteDelete: [PartialInvite];
   stageInstanceCreate: [StageInstance];
   stageInstanceUpdate: [StageInstance];
   stageInstanceDelete: [StageInstance];
@@ -221,10 +248,10 @@ export class Client extends EventEmitter {
         this.emit("messageReactionRemoveEmoji", d);
         break;
       case "MESSAGE_POLL_VOTE_ADD":
-        this.emit("messagePollVoteAdd", d);
+        this.emit("messagePollVoteAdd", toPollVoteData(d));
         break;
       case "MESSAGE_POLL_VOTE_REMOVE":
-        this.emit("messagePollVoteRemove", d);
+        this.emit("messagePollVoteRemove", toPollVoteData(d));
         break;
 
       // Guilds
@@ -273,11 +300,25 @@ export class Client extends EventEmitter {
         break;
       }
       case "GUILD_BAN_ADD":
-        this.emit("guildBanAdd", { guildId: d.guild_id, user: new User(this, d.user as APIUser) });
+        this.emit("guildBanAdd", new GuildBan(this, d.guild_id, { user: d.user, reason: null } as APIBan));
         break;
       case "GUILD_BAN_REMOVE":
-        this.emit("guildBanRemove", { guildId: d.guild_id, user: new User(this, d.user as APIUser) });
+        this.emit("guildBanRemove", new GuildBan(this, d.guild_id, { user: d.user, reason: null } as APIBan));
         break;
+      case "GUILD_MEMBERS_CHUNK": {
+        const guild = this.guilds.cache.get(d.guild_id);
+        const members = (d.members as APIMember[]).map((raw) =>
+          guild ? guild._patchMember(raw.user!.id, raw) : new Member(this, d.guild_id, raw),
+        );
+        this.emit("guildMembersChunk", {
+          guildId: d.guild_id,
+          members,
+          chunkIndex: d.chunk_index,
+          chunkCount: d.chunk_count,
+          nonce: d.nonce ?? null,
+        });
+        break;
+      }
 
       // Roles
       case "GUILD_ROLE_CREATE": {
@@ -348,10 +389,15 @@ export class Client extends EventEmitter {
 
       // Presence / typing / users
       case "PRESENCE_UPDATE":
-        this.emit("presenceUpdate", d);
+        this.emit("presenceUpdate", new Presence(d as APIPresence));
         break;
       case "TYPING_START":
-        this.emit("typingStart", d);
+        this.emit("typingStart", {
+          channelId: d.channel_id,
+          guildId: d.guild_id ?? null,
+          userId: d.user_id,
+          timestamp: d.timestamp,
+        });
         break;
       case "USER_UPDATE":
         this.emit("userUpdate", new User(this, d as APIUser));
@@ -375,10 +421,10 @@ export class Client extends EventEmitter {
         this.emit("webhooksUpdate", { guildId: d.guild_id, channelId: d.channel_id });
         break;
       case "INVITE_CREATE":
-        this.emit("inviteCreate", d);
+        this.emit("inviteCreate", new Invite(this, d as APIInvite));
         break;
       case "INVITE_DELETE":
-        this.emit("inviteDelete", d);
+        this.emit("inviteDelete", { code: d.code, channelId: d.channel_id, guildId: d.guild_id ?? null });
         break;
 
       // Stage instances
@@ -450,6 +496,16 @@ export class Client extends EventEmitter {
 
 function delay(ms: number): Promise<void> {
   return new Promise((resolve) => setTimeout(resolve, ms));
+}
+
+function toPollVoteData(d: Record<string, any>): PollVoteData {
+  return {
+    userId: d.user_id,
+    channelId: d.channel_id,
+    messageId: d.message_id,
+    guildId: d.guild_id ?? null,
+    answerId: d.answer_id,
+  };
 }
 
 export interface Client {

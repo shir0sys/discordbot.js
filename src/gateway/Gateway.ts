@@ -68,6 +68,24 @@ export class Gateway extends EventEmitter {
     this.socket.send(JSON.stringify({ op, d }));
   }
 
+  public requestGuildMembers(options: {
+    guildId: string;
+    query?: string;
+    limit?: number;
+    presences?: boolean;
+    userIds?: string[];
+    nonce: string;
+  }): void {
+    this.send(GatewayOpcodes.RequestGuildMembers, {
+      guild_id: options.guildId,
+      query: options.userIds ? undefined : options.query ?? "",
+      limit: options.userIds ? undefined : options.limit ?? 0,
+      presences: options.presences,
+      user_ids: options.userIds,
+      nonce: options.nonce,
+    });
+  }
+
   private onMessage(raw: string): void {
     const payload = JSON.parse(raw) as GatewayPayload;
     if (payload.s !== null) this.sequence = payload.s;
