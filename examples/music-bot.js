@@ -99,30 +99,52 @@ client.on("interactionCreate", async (interaction) => {
       // yt-dlp picks the best audio-only stream and writes it to stdout;
       // ffmpeg reads that on stdin and transcodes it to raw PCM on stdout.
       const ytdlp = spawn("yt-dlp", ["-f", "bestaudio", "--no-playlist", "-o", "-", url]);
-      ytdlp.stderr.on("data", () => {});
+      let ytdlpLog = "";
+      ytdlp.stderr.on("data", (chunk) => (ytdlpLog += chunk));
 
       const ffmpeg = spawn("ffmpeg", ["-i", "pipe:0", "-f", "s16le", "-ar", "48000", "-ac", "2", "pipe:1"]);
-      ffmpeg.stderr.on("data", () => {});
+      let ffmpegLog = "";
+      ffmpeg.stderr.on("data", (chunk) => (ffmpegLog += chunk));
       ytdlp.stdout.pipe(ffmpeg.stdin);
+
+      // If either side of the pipe exits first (bad URL, unsupported format,
+      // killed process...), the other keeps trying to read/write its end of
+      // a now-closed pipe. Node surfaces that as an 'error' event (EPIPE on
+      // the write side, ECONNRESET/EPIPE on the read side) on the stream —
+      // without a listener that's an unhandled error and kills the process.
+      ytdlp.stdout.on("error", () => {});
+      ffmpeg.stdin.on("error", () => {});
 
       const player = new AudioPlayer();
       connection.subscribe(player);
 
-      // A missing binary (ENOENT) or a crash fires 'error' on the child
-      // process asynchronously — without a listener, Node treats an
-      // unhandled 'error' event as fatal and kills the whole bot.
-      const failPlayback = (binary) => (error) => {
-        console.error(`${binary} failed:`, error.message);
+      // A missing binary (ENOENT), a crash, or a bad input URL all end with
+      // one side of the pipeline exiting — report it and tear the rest down
+      // instead of leaving a dangling process or letting an unhandled
+      // 'error' event kill the whole bot.
+      let playbackFailed = false;
+      const failPlayback = (binary, detail) => {
+        if (playbackFailed) return;
+        playbackFailed = true;
+        console.error(`${binary} failed:`, detail);
         player.stop();
         safeKill(ytdlp);
         safeKill(ffmpeg);
         sessions.delete(interaction.guildId);
         interaction
-          .editReply(`Could not start \`${binary}\` — make sure it's installed and on your PATH.`)
+          .editReply(
+            `\`${binary}\` failed — check the console for details (bad URL, unavailable video, or it's not installed).`,
+          )
           .catch(() => {});
       };
-      ytdlp.on("error", failPlayback("yt-dlp"));
-      ffmpeg.on("error", failPlayback("ffmpeg"));
+      ytdlp.on("error", (error) => failPlayback("yt-dlp", error.message));
+      ffmpeg.on("error", (error) => failPlayback("ffmpeg", error.message));
+      ytdlp.on("close", (code) => {
+        if (code !== 0 && code !== null) failPlayback("yt-dlp", ytdlpLog || `exited with code ${code}`);
+      });
+      ffmpeg.on("close", (code) => {
+        if (code !== 0 && code !== null) failPlayback("ffmpeg", ffmpegLog || `exited with code ${code}`);
+      });
 
       const resource = AudioResource.fromPCMStream(ffmpeg.stdout);
       player.play(resource);
