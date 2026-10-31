@@ -1,0 +1,153 @@
+import { EventEmitter } from "node:events";
+import { VoiceOpcodes, VOICE_GATEWAY_VERSION, ENCRYPTION_MODE } from "./VoiceConstants";
+
+export interface VoiceGatewayOptions {
+  endpoint: string;
+  guildId: string;
+  userId: string;
+  sessionId: string;
+  token: string;
+}
+
+export interface VoiceReadyData {
+  ssrc: number;
+  ip: string;
+  port: number;
+  modes: string[];
+}
+
+export interface VoiceSessionDescription {
+  mode: string;
+  secretKey: Uint8Array;
+}
+
+type VoiceGatewayEvents = {
+  ready: [VoiceReadyData];
+  sessionDescription: [VoiceSessionDescription];
+  hello: [];
+  resumed: [];
+  close: [number];
+  debug: [string];
+};
+
+/**
+ * One voice gateway session: handshake (IDENTIFY -> READY -> SELECT_PROTOCOL
+ * -> SESSION_DESCRIPTION), heartbeating, and RESUME on recoverable drops.
+ * Mirrors the main Gateway's structure but speaks the separate voice
+ * protocol (different opcodes, a different handshake shape, no dispatch
+ * events — everything here is already domain-specific).
+ */
+export class VoiceGateway extends EventEmitter {
+  private socket: WebSocket | null = null;
+  private heartbeatTimer: ReturnType<typeof setInterval> | null = null;
+  private heartbeatAcked = true;
+  private sessionId: string | null = null;
+  private serverSessionId: string | null = null;
+  private destroyed = false;
+
+  constructor(private readonly options: VoiceGatewayOptions) {
+    super();
+  }
+
+  public connect(): void {
+    this.destroyed = false;
+    const host = this.options.endpoint.replace(/:\d+$/, "");
+    const url = `wss://${host}/?v=${VOICE_GATEWAY_VERSION}`;
+    this.socket = new WebSocket(url);
+    this.socket.addEventListener("open", () => this.emit("debug", "voice socket open"));
+    this.socket.addEventListener("message", (event) => this.onMessage(event.data as string));
+    this.socket.addEventListener("close", (event) => this.onClose(event.code));
+    this.socket.addEventListener("error", (event) => this.emit("debug", `voice socket error: ${String(event)}`));
+  }
+
+  public destroy(): void {
+    this.destroyed = true;
+    this.clearHeartbeat();
+    this.socket?.close(1000);
+    this.socket = null;
+  }
+
+  public send(op: VoiceOpcodes, d: unknown): void {
+    if (this.socket?.readyState !== WebSocket.OPEN) return;
+    this.socket.send(JSON.stringify({ op, d }));
+  }
+
+  public sendSelectProtocol(address: string, port: number): void {
+    this.send(VoiceOpcodes.SelectProtocol, {
+      protocol: "udp",
+      data: { address, port, mode: ENCRYPTION_MODE },
+    });
+  }
+
+  public sendSpeaking(ssrc: number, speaking = true): void {
+    this.send(VoiceOpcodes.Speaking, { speaking: speaking ? 1 : 0, delay: 0, ssrc });
+  }
+
+  private onMessage(raw: string): void {
+    const payload = JSON.parse(raw) as { op: VoiceOpcodes; d: any };
+
+    switch (payload.op) {
+      case VoiceOpcodes.Hello:
+        this.startHeartbeat(payload.d.heartbeat_interval);
+        this.emit("hello");
+        this.identify();
+        break;
+      case VoiceOpcodes.Ready:
+        this.emit("ready", { ssrc: payload.d.ssrc, ip: payload.d.ip, port: payload.d.port, modes: payload.d.modes });
+        break;
+      case VoiceOpcodes.SessionDescription:
+        this.emit("sessionDescription", { mode: payload.d.mode, secretKey: Uint8Array.from(payload.d.secret_key) });
+        break;
+      case VoiceOpcodes.HeartbeatAck:
+        this.heartbeatAcked = true;
+        break;
+      case VoiceOpcodes.Resumed:
+        this.emit("resumed");
+        break;
+    }
+  }
+
+  private identify(): void {
+    this.send(VoiceOpcodes.Identify, {
+      server_id: this.options.guildId,
+      user_id: this.options.userId,
+      session_id: this.options.sessionId,
+      token: this.options.token,
+    });
+  }
+
+  private startHeartbeat(intervalMs: number): void {
+    this.clearHeartbeat();
+    this.heartbeatAcked = true;
+    this.heartbeatTimer = setInterval(() => {
+      if (!this.heartbeatAcked) {
+        this.emit("debug", "voice heartbeat not acked, reconnecting");
+        this.socket?.close();
+        return;
+      }
+      this.heartbeatAcked = false;
+      this.send(VoiceOpcodes.Heartbeat, Date.now());
+    }, intervalMs);
+    this.heartbeatTimer.unref?.();
+  }
+
+  private clearHeartbeat(): void {
+    if (this.heartbeatTimer) clearInterval(this.heartbeatTimer);
+    this.heartbeatTimer = null;
+  }
+
+  private onClose(code: number): void {
+    this.clearHeartbeat();
+    this.emit("close", code);
+    if (this.destroyed) return;
+    // 4006 (session no longer valid) and 4014 (disconnected by Discord, e.g.
+    // moved/kicked) are not worth auto-reconnecting; everything else, retry.
+    if (code === 4006 || code === 4014) return;
+    setTimeout(() => this.connect(), 1000);
+  }
+}
+
+export interface VoiceGateway {
+  on<K extends keyof VoiceGatewayEvents>(event: K, listener: (...args: VoiceGatewayEvents[K]) => void): this;
+  emit<K extends keyof VoiceGatewayEvents>(event: K, ...args: VoiceGatewayEvents[K]): boolean;
+}
