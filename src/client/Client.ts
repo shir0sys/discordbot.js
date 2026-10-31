@@ -6,6 +6,8 @@ import { GuildManager } from "../managers/GuildManager";
 import { ChannelManager } from "../managers/ChannelManager";
 import { UserManager } from "../managers/UserManager";
 import { ApplicationCommandManager } from "../managers/ApplicationCommandManager";
+import { MonetizationManager } from "../managers/MonetizationManager";
+import { SoundboardManager } from "../managers/SoundboardManager";
 import { ClientUser } from "../structures/ClientUser";
 import { Guild, type APIGuild } from "../structures/Guild";
 import { createChannel } from "../structures/ChannelFactory";
@@ -24,6 +26,7 @@ import { MessageComponentInteraction } from "../structures/MessageComponentInter
 import { ModalSubmitInteraction } from "../structures/ModalSubmitInteraction";
 import { AutocompleteInteraction } from "../structures/AutocompleteInteraction";
 import { ApplicationCommandType, InteractionType } from "../util/Constants";
+import { ShardClientUtil } from "../sharding/ShardClientUtil";
 import type { APIChannel } from "../structures/Channel";
 
 export interface ClientOptions {
@@ -97,7 +100,10 @@ export class Client extends EventEmitter {
   public readonly channels: ChannelManager;
   public readonly users: UserManager;
   public readonly application: ApplicationCommandManager;
+  public readonly monetization: MonetizationManager;
+  public readonly soundboard: SoundboardManager;
   public readonly intents: IntentsBitField;
+  public readonly shard: ShardClientUtil;
 
   // Constructed lazily in login(): the REST/Gateway clients need the bot
   // token up front and ClientOptions alone doesn't carry one.
@@ -114,6 +120,9 @@ export class Client extends EventEmitter {
     this.channels = new ChannelManager(this);
     this.users = new UserManager(this);
     this.application = new ApplicationCommandManager(this);
+    this.monetization = new MonetizationManager(this);
+    this.soundboard = new SoundboardManager(this);
+    this.shard = new ShardClientUtil(this);
   }
 
   public get rest(): REST {
@@ -133,6 +142,13 @@ export class Client extends EventEmitter {
 
   public async login(token: string): Promise<void> {
     this._rest = new REST({ token });
+
+    // When forked by ShardingManager, this process already *is* one shard —
+    // run exactly the shard id/count it was given rather than spawning more.
+    if (process.env.SHARD_COUNT) {
+      this.spawnShard(token, Number(process.env.SHARD_ID ?? 0), Number(process.env.SHARD_COUNT));
+      return;
+    }
 
     if (!this.options.shardCount) {
       this.spawnShard(token, 0, 0);
