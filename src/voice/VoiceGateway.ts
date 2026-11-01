@@ -142,6 +142,11 @@ export class VoiceGateway extends EventEmitter {
       user_id: this.options.userId,
       session_id: this.options.sessionId,
       token: this.options.token,
+      // Declares no DAVE (end-to-end encryption) protocol support, opting
+      // into the plain legacy handshake this client speaks. Omitting this
+      // field entirely on a guild where DAVE is active is a known cause of
+      // an immediate 4006 right after IDENTIFY.
+      max_dave_protocol_version: 0,
     });
   }
 
