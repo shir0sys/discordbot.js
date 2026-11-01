@@ -20,7 +20,6 @@ type DaveSessionEvents = {
  */
 export class DaveSession extends EventEmitter {
   private session: DAVESession;
-  private readonly recognizedUserIds = new Set<string>();
 
   constructor(
     private protocolVersion: number,
@@ -29,19 +28,10 @@ export class DaveSession extends EventEmitter {
   ) {
     super();
     this.session = new DAVESession(protocolVersion, userId, channelId);
-    this.recognizedUserIds.add(userId);
   }
 
   public get ready(): boolean {
     return this.session.ready;
-  }
-
-  public addRecognizedUser(id: string): void {
-    this.recognizedUserIds.add(id);
-  }
-
-  public removeRecognizedUser(id: string): void {
-    this.recognizedUserIds.delete(id);
   }
 
   /** Submits our key package — per the DAVE handshake, this happens as soon as a non-zero dave_protocol_version is known, independent of when the external sender arrives. */
@@ -56,7 +46,15 @@ export class DaveSession extends EventEmitter {
   public handleProposals(operationType: number, data: Buffer): void {
     let result: ProposalsResult;
     try {
-      result = this.session.processProposals(operationType, data, [...this.recognizedUserIds]);
+      // Not passing recognizedUserIds here: it's meant to reject proposals
+      // for users the client hasn't seen join/leave, but clients_connect
+      // only fires for members who connect *after* us — members already in
+      // the channel when we join are never announced that way, so this
+      // check reliably (and wrongly) rejects proposals that add them,
+      // observed live as processProposals throwing UnexpectedUser(...) for
+      // an already-present member. Trusting the voice gateway's own
+      // proposals is reasonable here; it's the one source for this group.
+      result = this.session.processProposals(operationType, data);
     } catch (error) {
       this.emit("debug", `processProposals failed: ${(error as Error).message}`);
       return;

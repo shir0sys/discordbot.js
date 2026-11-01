@@ -85,9 +85,6 @@ export class VoiceConnection extends EventEmitter {
       }
     });
 
-    gateway.on("clientsConnect", (userIds) => userIds.forEach((id) => this.dave?.addRecognizedUser(id)));
-    gateway.on("clientDisconnect", (userId) => this.dave?.removeRecognizedUser(userId));
-
     gateway.on("daveExternalSender", (data) => this.runOrQueueDave(() => this.dave!.handleExternalSender(data)));
     gateway.on("daveProposals", ({ operationType, data }) =>
       this.runOrQueueDave(() => this.dave!.handleProposals(operationType, data)),
