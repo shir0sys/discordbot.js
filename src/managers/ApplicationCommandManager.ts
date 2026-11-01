@@ -1,5 +1,6 @@
 import type { SlashCommandBuilder } from "../builders/SlashCommandBuilder";
 import type { Client } from "../client/Client";
+import { ApplicationCommand, ApplicationCommandPermissions } from "../structures/ApplicationCommand";
 
 export interface ApplicationCommandOption {
   type: number;
@@ -58,44 +59,51 @@ export class ApplicationCommandManager {
     return guildId ? `/applications/${appId}/guilds/${guildId}/commands` : `/applications/${appId}/commands`;
   }
 
-  public async set(commands: CommandInput[], guildId?: string): Promise<APIApplicationCommand[]> {
-    return this.client.rest.put<APIApplicationCommand[]>(this.basePath(guildId), commands.map(resolve));
+  public async set(commands: CommandInput[], guildId?: string): Promise<ApplicationCommand[]> {
+    const data = await this.client.rest.put<APIApplicationCommand[]>(this.basePath(guildId), commands.map(resolve));
+    return data.map((raw) => new ApplicationCommand(this.client, raw));
   }
 
-  public async create(command: CommandInput, guildId?: string): Promise<APIApplicationCommand> {
-    return this.client.rest.post<APIApplicationCommand>(this.basePath(guildId), resolve(command));
+  public async create(command: CommandInput, guildId?: string): Promise<ApplicationCommand> {
+    const data = await this.client.rest.post<APIApplicationCommand>(this.basePath(guildId), resolve(command));
+    return new ApplicationCommand(this.client, data);
   }
 
-  public async fetchAll(guildId?: string): Promise<APIApplicationCommand[]> {
-    return this.client.rest.get<APIApplicationCommand[]>(this.basePath(guildId));
+  public async fetchAll(guildId?: string): Promise<ApplicationCommand[]> {
+    const data = await this.client.rest.get<APIApplicationCommand[]>(this.basePath(guildId));
+    return data.map((raw) => new ApplicationCommand(this.client, raw));
   }
 
-  public async fetch(commandId: string, guildId?: string): Promise<APIApplicationCommand> {
-    return this.client.rest.get<APIApplicationCommand>(`${this.basePath(guildId)}/${commandId}`);
+  public async fetch(commandId: string, guildId?: string): Promise<ApplicationCommand> {
+    const data = await this.client.rest.get<APIApplicationCommand>(`${this.basePath(guildId)}/${commandId}`);
+    return new ApplicationCommand(this.client, data);
   }
 
   public async edit(
     commandId: string,
     command: Partial<ApplicationCommandData>,
     guildId?: string,
-  ): Promise<APIApplicationCommand> {
-    return this.client.rest.patch<APIApplicationCommand>(`${this.basePath(guildId)}/${commandId}`, command);
+  ): Promise<ApplicationCommand> {
+    const data = await this.client.rest.patch<APIApplicationCommand>(`${this.basePath(guildId)}/${commandId}`, command);
+    return new ApplicationCommand(this.client, data);
   }
 
   public async delete(commandId: string, guildId?: string): Promise<void> {
     await this.client.rest.delete(`${this.basePath(guildId)}/${commandId}`);
   }
 
-  public async fetchPermissions(commandId: string, guildId: string): Promise<APIGuildApplicationCommandPermissions> {
-    return this.client.rest.get<APIGuildApplicationCommandPermissions>(
+  public async fetchPermissions(commandId: string, guildId: string): Promise<ApplicationCommandPermissions> {
+    const data = await this.client.rest.get<APIGuildApplicationCommandPermissions>(
       `/applications/${this.appId()}/guilds/${guildId}/commands/${commandId}/permissions`,
     );
+    return new ApplicationCommandPermissions(this.client, data);
   }
 
-  public async fetchAllPermissions(guildId: string): Promise<APIGuildApplicationCommandPermissions[]> {
-    return this.client.rest.get<APIGuildApplicationCommandPermissions[]>(
+  public async fetchAllPermissions(guildId: string): Promise<ApplicationCommandPermissions[]> {
+    const data = await this.client.rest.get<APIGuildApplicationCommandPermissions[]>(
       `/applications/${this.appId()}/guilds/${guildId}/commands/permissions`,
     );
+    return data.map((raw) => new ApplicationCommandPermissions(this.client, raw));
   }
 
   /**
@@ -108,12 +116,13 @@ export class ApplicationCommandManager {
     guildId: string,
     permissions: APICommandPermission[],
     bearerToken: string,
-  ): Promise<APIGuildApplicationCommandPermissions> {
+  ): Promise<ApplicationCommandPermissions> {
     const { REST } = await import("../rest/REST");
     const bearerRest = new REST({ token: bearerToken, authPrefix: "Bearer" });
-    return bearerRest.put<APIGuildApplicationCommandPermissions>(
+    const data = await bearerRest.put<APIGuildApplicationCommandPermissions>(
       `/applications/${this.appId()}/guilds/${guildId}/commands/${commandId}/permissions`,
       { permissions },
     );
+    return new ApplicationCommandPermissions(this.client, data);
   }
 }

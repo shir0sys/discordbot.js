@@ -22,6 +22,9 @@ import {
   type APIGuildPreview,
 } from "./GuildOnboarding";
 import { GuildTemplateManager } from "../managers/GuildTemplateManager";
+import { GuildApplicationCommandManager } from "../managers/GuildApplicationCommandManager";
+import { AutoModerationRuleManager } from "../managers/AutoModerationRuleManager";
+import { GuildScheduledEventManager } from "../managers/GuildScheduledEventManager";
 import { Invite, type APIInvite } from "./Invite";
 import type { Client } from "../client/Client";
 
@@ -57,6 +60,9 @@ export class Guild extends Base {
   public readonly stickers: GuildStickerManager;
   public readonly soundboardSounds: GuildSoundboardManager;
   public readonly templates: GuildTemplateManager;
+  public readonly commands: GuildApplicationCommandManager;
+  public readonly autoModerationRules: AutoModerationRuleManager;
+  public readonly scheduledEvents: GuildScheduledEventManager;
   public readonly voiceStates = new Collection<string, VoiceState>();
 
   constructor(client: Client, data: APIGuild) {
@@ -75,6 +81,9 @@ export class Guild extends Base {
     this.stickers = new GuildStickerManager(client, this.id);
     this.soundboardSounds = new GuildSoundboardManager(client, this.id);
     this.templates = new GuildTemplateManager(client, this.id);
+    this.commands = new GuildApplicationCommandManager(client, this.id);
+    this.autoModerationRules = new AutoModerationRuleManager(client, this.id);
+    this.scheduledEvents = new GuildScheduledEventManager(client, this.id);
 
     for (const role of data.roles) this.roles.set(role.id, new Role(client, this.id, role));
     for (const channel of data.channels ?? []) this.channels.set(channel.id, createChannel(client, channel));
