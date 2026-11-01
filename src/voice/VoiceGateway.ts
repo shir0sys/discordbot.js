@@ -68,10 +68,11 @@ export class VoiceGateway extends EventEmitter {
     this.destroyed = false;
     const host = this.options.endpoint.replace(/:\d+$/, "");
     const url = `wss://${host}/?v=${VOICE_GATEWAY_VERSION}`;
+    this.emit("debug", `connecting to ${url} (raw endpoint: ${this.options.endpoint})`);
     this.socket = new WebSocket(url);
     this.socket.addEventListener("open", () => this.emit("debug", "voice socket open"));
     this.socket.addEventListener("message", (event) => this.onMessage(event.data as string));
-    this.socket.addEventListener("close", (event) => this.onClose(event.code));
+    this.socket.addEventListener("close", (event) => this.onClose(event.code, (event as CloseEvent).reason));
     this.socket.addEventListener("error", (event) => this.emit("debug", `voice socket error: ${String(event)}`));
   }
 
@@ -126,7 +127,16 @@ export class VoiceGateway extends EventEmitter {
   }
 
   private identify(): void {
-    this.emit("debug", "sending voice IDENTIFY");
+    // Temporary diagnostic: printing the exact fields (not just "sending
+    // IDENTIFY") to find out which one Discord is actually rejecting,
+    // since 4006 gives no further detail. session_id/server_id/user_id
+    // aren't secret; the token is shown truncated.
+    this.emit(
+      "debug",
+      `sending voice IDENTIFY: server_id=${this.options.guildId} user_id=${this.options.userId} ` +
+        `session_id=${this.options.sessionId} (len ${this.options.sessionId.length}) ` +
+        `token=${this.options.token.slice(0, 8)}... (len ${this.options.token.length})`,
+    );
     this.send(VoiceOpcodes.Identify, {
       server_id: this.options.guildId,
       user_id: this.options.userId,
@@ -155,9 +165,12 @@ export class VoiceGateway extends EventEmitter {
     this.heartbeatTimer = null;
   }
 
-  private onClose(code: number): void {
+  private onClose(code: number, reason?: string): void {
     this.clearHeartbeat();
-    this.emit("debug", `voice socket closed: ${code} (${VOICE_CLOSE_CODE_REASONS[code] ?? "unknown"})`);
+    this.emit(
+      "debug",
+      `voice socket closed: ${code} (${VOICE_CLOSE_CODE_REASONS[code] ?? "unknown"})${reason ? ` — reason: ${reason}` : ""}`,
+    );
     this.emit("close", code);
     if (this.destroyed) return;
     // 4006 (session no longer valid) and 4014 (disconnected by Discord, e.g.
