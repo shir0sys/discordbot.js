@@ -30,7 +30,7 @@ import { ShardClientUtil } from "../sharding/ShardClientUtil";
 import { GuildBan, type APIBan } from "../structures/GuildBan";
 import { Invite, type APIInvite, type PartialInvite } from "../structures/Invite";
 import { Presence, type APIPresence } from "../structures/Presence";
-import { VoiceConnection } from "../voice/VoiceConnection";
+import { VoiceConnection, VoiceConnectionStatus } from "../voice/VoiceConnection";
 import type { APIChannel } from "../structures/Channel";
 
 export interface TypingStartData {
@@ -334,6 +334,33 @@ export class Client extends EventEmitter {
     // unhandled 'error' event if something goes wrong before the caller
     // gets a reference to the connection to listen on it themselves.
     connection.on("error", (error) => this.emit("debug", `[voice] error: ${error.message}`));
+
+    // Keep reacting to corrected VOICE_STATE_UPDATE/VOICE_SERVER_UPDATE pairs
+    // for as long as this connection lives, not just during the initial
+    // debounce window above — Discord can send one after the voice websocket
+    // has already started connecting, which otherwise surfaces as a 4006
+    // right after IDENTIFY.
+    const onLiveState = (liveState: VoiceState) => {
+      if (liveState.guildId !== guildId || liveState.userId !== this.user!.id) return;
+      if (liveState.channelId === null) {
+        connection.destroy();
+        this.voiceConnections.delete(guildId);
+        return;
+      }
+      connection.updateVoiceData({ sessionId: liveState.sessionId });
+    };
+    const onLiveServer = (liveServer: Record<string, any>) => {
+      if (liveServer.guild_id !== guildId) return;
+      connection.updateVoiceData({ token: liveServer.token, endpoint: liveServer.endpoint });
+    };
+    this.on("voiceStateUpdate", onLiveState);
+    this.on("voiceServerUpdate", onLiveServer);
+    connection.on("stateChange", (connState) => {
+      if (connState === VoiceConnectionStatus.Destroyed) {
+        this.off("voiceStateUpdate", onLiveState);
+        this.off("voiceServerUpdate", onLiveServer);
+      }
+    });
 
     try {
       await connection.waitUntilReady(timeout);

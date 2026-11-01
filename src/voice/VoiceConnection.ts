@@ -30,7 +30,12 @@ export class VoiceConnection extends EventEmitter {
   public readonly guildId: string;
   public readonly channelId: string;
 
-  private readonly gateway: VoiceGateway;
+  private readonly userId: string;
+  private sessionId: string;
+  private token: string;
+  private endpoint: string;
+
+  private gateway: VoiceGateway;
   private udp: VoiceUDP | null = null;
   private player: AudioPlayer | null = null;
   private ssrc: number | null = null;
@@ -41,19 +46,59 @@ export class VoiceConnection extends EventEmitter {
     super();
     this.guildId = options.guildId;
     this.channelId = options.channelId;
+    this.userId = options.userId;
+    this.sessionId = options.sessionId;
+    this.token = options.token;
+    this.endpoint = options.endpoint;
 
-    this.gateway = new VoiceGateway({
-      endpoint: options.endpoint,
-      guildId: options.guildId,
-      userId: options.userId,
-      sessionId: options.sessionId,
-      token: options.token,
+    this.gateway = this.createGateway();
+    this.gateway.connect();
+  }
+
+  private createGateway(): VoiceGateway {
+    const gateway = new VoiceGateway({
+      endpoint: this.endpoint,
+      guildId: this.guildId,
+      userId: this.userId,
+      sessionId: this.sessionId,
+      token: this.token,
     });
 
-    this.gateway.on("debug", (message) => this.emit("debug", message));
-    this.gateway.on("ready", (data) => this.onVoiceReady(data));
-    this.gateway.on("sessionDescription", (data) => this.onSessionDescription(data));
-    this.gateway.on("close", (code) => this.emit("debug", `voice gateway closed: ${code}`));
+    gateway.on("debug", (message) => this.emit("debug", message));
+    gateway.on("ready", (data) => this.onVoiceReady(data));
+    gateway.on("sessionDescription", (data) => this.onSessionDescription(data));
+    gateway.on("close", (code) => this.emit("debug", `voice gateway closed: ${code}`));
+    return gateway;
+  }
+
+  /**
+   * Discord can (and routinely does) send a corrected VOICE_STATE_UPDATE/
+   * VOICE_SERVER_UPDATE pair after the first one, including while the voice
+   * websocket from the first pair is still connecting — by the time IDENTIFY
+   * goes out, the session it names has already been superseded server-side,
+   * which Discord reports as a 4006 right after IDENTIFY. Rather than trying
+   * to guess a safe debounce window before connecting at all, keep reacting
+   * to new credentials for the life of the connection and re-identify with
+   * whatever is actually current.
+   */
+  public updateVoiceData(data: { sessionId?: string; token?: string; endpoint?: string }): void {
+    const sessionId = data.sessionId ?? this.sessionId;
+    const token = data.token ?? this.token;
+    const endpoint = data.endpoint ?? this.endpoint;
+    if (sessionId === this.sessionId && token === this.token && endpoint === this.endpoint) return;
+    if (this.status === VoiceConnectionStatus.Destroyed) return;
+
+    this.sessionId = sessionId;
+    this.token = token;
+    this.endpoint = endpoint;
+
+    this.emit("debug", "voice credentials superseded, re-identifying with the latest session");
+    this.gateway.destroy();
+    this.udp?.close();
+    this.udp = null;
+    this.ssrc = null;
+    this.status = VoiceConnectionStatus.Connecting;
+    this.gateway = this.createGateway();
     this.gateway.connect();
   }
 
