@@ -2,7 +2,7 @@
 
 [![CI](https://github.com/shir0sys/discordbot.js/actions/workflows/ci.yml/badge.svg)](https://github.com/shir0sys/discordbot.js/actions/workflows/ci.yml)
 
-A Discord API v10 wrapper for Node.js (>=22). REST, gateway, interactions, builders and voice are all built on Node's native `fetch`/`WebSocket`/`EventEmitter`/`crypto`/`dgram` — the one real runtime dependency is [`opusscript`](https://www.npmjs.com/package/opusscript) (a pure WASM port of libopus), used only by the voice module for Opus encoding.
+A Discord API v10 wrapper for Node.js (>=22). REST, gateway, interactions, builders and voice are all built on Node's native `fetch`/`WebSocket`/`EventEmitter`/`crypto`/`dgram` — the real runtime dependencies are [`opusscript`](https://www.npmjs.com/package/opusscript) (a pure WASM port of libopus, for Opus encoding) and [`@snazzah/davey`](https://www.npmjs.com/package/@snazzah/davey) (a native MLS/DAVE implementation, for the end-to-end encryption Discord now requires on most voice channels) — both used only by the voice module.
 
 ## Usage
 
@@ -37,10 +37,10 @@ Runs the TypeScript build then the test suite with Node's built-in test runner (
 - `src/managers` — caches and REST-backed collections (`Collection`, `GuildMemberManager`, `RoleManager`, `MessageManager`, ...).
 - `src/builders` — `EmbedBuilder`, classic components (buttons/select menus), Components V2 layout components, modals, `SlashCommandBuilder`, `ContextMenuCommandBuilder`, `AttachmentBuilder`, `PollBuilder`.
 - `src/util` — bitfields (`PermissionsBitField`, `IntentsBitField`, ...), `Formatters`, `SnowflakeUtil`, color resolution, typed errors.
-- `src/voice` — voice gateway client, UDP transport (IP discovery, RTP framing, AES-256-GCM encryption via `node:crypto`), `AudioPlayer`/`AudioResource`, and the `opusscript`-backed `OpusEncoder`.
+- `src/voice` — voice gateway client, UDP transport (IP discovery, RTP framing, AES-256-GCM encryption via `node:crypto`), `AudioPlayer`/`AudioResource`, the `opusscript`-backed `OpusEncoder`, and `DaveSession` (the DAVE/MLS end-to-end encryption handshake, built on `@snazzah/davey`).
 
 ## Scope and caveats
 
-- **Voice does not work on channels/guilds where Discord requires DAVE (end-to-end encryption).** Verified against a live voice server: the gateway handshake, UDP IP discovery and RTP/AES-256-GCM framing all work correctly, but Discord now mandates the DAVE protocol (an MLS-based end-to-end encryption scheme) for voice connections, which this library does not implement — it's a substantial protocol in its own right (group key ratcheting, epochs, proposals/commits), not a small addition. A connection attempt on a DAVE-required channel fails fast with a clear "E2EE/DAVE protocol required" error instead of hanging or crashing, but there is currently no way to actually join such a channel.
-- No voice *receive* (listening to other members) — send-only.
+- **DAVE (end-to-end encryption) handshake plumbing is implemented but unverified against a real multi-member DAVE call.** Discord now requires DAVE on most voice channels; this client negotiates `max_dave_protocol_version` in IDENTIFY, routes the voice gateway's binary MLS opcodes (external sender, key package, proposals, commit/welcome, transitions) to `@snazzah/davey`'s `DAVESession`, and encrypts outgoing Opus frames once the group is established — all built from Discord's published spec at daveprotocol.com, not by reading another working client's wire traffic. The core voice transport (gateway handshake, UDP IP discovery, RTP/AES-256-GCM framing) *is* verified against a live Discord voice server; the DAVE layer specifically still needs that same live verification.
+- No voice *receive* (listening to other members) — send-only. Decrypting other members' DAVE-encrypted audio isn't implemented either.
 - No automatic reconnection/resilience on voice gateway drops beyond a basic reconnect for genuinely transient close codes; no jitter buffering.
