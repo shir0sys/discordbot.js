@@ -1,6 +1,7 @@
 import { EventEmitter } from "node:events";
 import { VoiceGateway, UNRECOVERABLE_VOICE_CLOSE_CODES, VOICE_CLOSE_CODE_REASONS } from "./VoiceGateway";
 import { VoiceUDP } from "./VoiceUDP";
+import { DaveSession } from "./DaveSession";
 import type { AudioPlayer } from "./AudioPlayer";
 import { AudioPlayerStatus } from "./AudioPlayer";
 
@@ -41,6 +42,12 @@ export class VoiceConnection extends EventEmitter {
   private ssrc: number | null = null;
   private status: VoiceConnectionStatus = VoiceConnectionStatus.Connecting;
   private silenceFramesRemaining = 0;
+  private dave: DaveSession | null = null;
+  // Binary DAVE events (external sender, proposals, commit/welcome) can in
+  // principle arrive before SESSION_DESCRIPTION tells us the negotiated
+  // dave_protocol_version and lets us construct the DaveSession — queue
+  // them and replay once it exists rather than assuming a fixed order.
+  private pendingDaveEvents: (() => void)[] = [];
 
   constructor(options: VoiceConnectionOptions) {
     super();
@@ -77,6 +84,36 @@ export class VoiceConnection extends EventEmitter {
         this.destroy();
       }
     });
+
+    gateway.on("clientsConnect", (userIds) => userIds.forEach((id) => this.dave?.addRecognizedUser(id)));
+    gateway.on("clientDisconnect", (userId) => this.dave?.removeRecognizedUser(userId));
+
+    gateway.on("daveExternalSender", (data) => this.runOrQueueDave(() => this.dave!.handleExternalSender(data)));
+    gateway.on("daveProposals", ({ operationType, data }) =>
+      this.runOrQueueDave(() => this.dave!.handleProposals(operationType, data)),
+    );
+    gateway.on("daveAnnounceCommitTransition", ({ transitionId, commit }) =>
+      this.runOrQueueDave(() => this.dave!.handleAnnounceCommitTransition(transitionId, commit)),
+    );
+    gateway.on("daveWelcome", ({ transitionId, welcome }) =>
+      this.runOrQueueDave(() => this.dave!.handleWelcome(transitionId, welcome)),
+    );
+    gateway.on("davePrepareEpoch", ({ transitionId, protocolVersion }) => {
+      this.runOrQueueDave(() => this.dave!.handlePrepareEpoch(protocolVersion));
+      gateway.sendDaveTransitionReady(transitionId);
+    });
+    gateway.on("davePrepareTransition", ({ transitionId, protocolVersion }) => {
+      // protocol_version 0 means the call is downgrading out of E2EE entirely.
+      if (protocolVersion === 0) this.dave?.setPassthroughMode(true);
+      gateway.sendDaveTransitionReady(transitionId);
+    });
+    gateway.on("daveExecuteTransition", () => {
+      // Nothing to actively do here: encryptOpus() is only consulted when
+      // this.dave is non-null and ready, so a downgrade just means we stop
+      // consulting it once the server confirms the transition via a later
+      // prepare_epoch, or the connection is torn down.
+    });
+
     return gateway;
   }
 
@@ -106,6 +143,8 @@ export class VoiceConnection extends EventEmitter {
     this.udp?.close();
     this.udp = null;
     this.ssrc = null;
+    this.dave = null;
+    this.pendingDaveEvents = [];
     this.status = VoiceConnectionStatus.Connecting;
     this.gateway = this.createGateway();
     this.gateway.connect();
@@ -130,12 +169,49 @@ export class VoiceConnection extends EventEmitter {
     }
   }
 
-  private onSessionDescription(data: { secretKey: Uint8Array }): void {
+  private onSessionDescription(data: { secretKey: Uint8Array; daveProtocolVersion: number }): void {
     this.udp?.setSecretKey(data.secretKey);
     if (this.player) this.player.attach(this.udp!);
+
+    if (data.daveProtocolVersion > 0 && !this.dave) {
+      this.dave = this.createDaveSession(data.daveProtocolVersion);
+      this.pendingDaveEvents.forEach((run) => run());
+      this.pendingDaveEvents = [];
+      this.dave.start();
+    }
+
+    // Without DAVE, the connection is ready for audio right away. With it,
+    // wait for the MLS group handshake (driven by the dave* events above) to
+    // actually finish — encryptOpus() would otherwise be called on a session
+    // that isn't ready yet, which fails.
+    if (!this.dave || this.dave.ready) this.markReady();
+  }
+
+  private markReady(): void {
+    if (this.status === VoiceConnectionStatus.Ready) return;
     this.status = VoiceConnectionStatus.Ready;
-    this.emit("debug", "session description received, connection ready");
+    this.emit("debug", "connection ready");
     this.emit("stateChange", this.status);
+  }
+
+  private createDaveSession(protocolVersion: number): DaveSession {
+    const dave = new DaveSession(protocolVersion, this.userId, this.channelId);
+    dave.on("debug", (message) => this.emit("debug", `[dave] ${message}`));
+    dave.on("sendKeyPackage", (keyPackage) => this.gateway.sendDaveKeyPackage(keyPackage));
+    dave.on("sendCommitWelcome", (commit, welcome) => this.gateway.sendDaveCommitWelcome(commit, welcome));
+    dave.on("sendReady", (transitionId) => this.gateway.sendDaveTransitionReady(transitionId));
+    dave.on("sendInvalidCommitWelcome", (transitionId) => this.gateway.sendDaveInvalidCommitWelcome(transitionId));
+    dave.on("ready", () => {
+      this.udp?.setFrameEncryptor((frame) => dave.encryptOpus(frame));
+      this.markReady();
+    });
+    return dave;
+  }
+
+  /** DAVE events can arrive before SESSION_DESCRIPTION constructs the DaveSession — queue them instead of dropping them. */
+  private runOrQueueDave(run: () => void): void {
+    if (this.dave) run();
+    else this.pendingDaveEvents.push(run);
   }
 
   public get state(): VoiceConnectionStatus {
