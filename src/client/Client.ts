@@ -124,19 +124,23 @@ type ClientEvents = {
   messagePollVoteAdd: [PollVoteData];
   messagePollVoteRemove: [PollVoteData];
   guildCreate: [Guild];
-  guildUpdate: [Guild];
+  /** The "old" snapshot only carries the handful of scalar fields GUILD_UPDATE actually changes (name/icon/ownerId) — Guild._patch() mutates the cached instance in place, so anything not captured here is already gone by the time this fires. */
+  guildUpdate: [old: { name: string; icon: string | null; ownerId: string } | null, current: Guild];
   guildDelete: [{ id: string; unavailable: boolean }];
   guildMemberAdd: [Member];
   guildMemberRemove: [{ guildId: string; user: User }];
-  guildMemberUpdate: [Member];
+  guildMemberUpdate: [old: Member | null, current: Member];
   guildMembersChunk: [GuildMembersChunkData];
   guildBanAdd: [GuildBan];
   guildBanRemove: [GuildBan];
   roleCreate: [Role];
-  roleUpdate: [Role];
-  roleDelete: [{ guildId: string; roleId: string }];
+  roleUpdate: [old: Role | null, current: Role];
+  roleDelete: [Role | null];
   channelCreate: [import("../structures/Channel").Channel];
-  channelUpdate: [import("../structures/Channel").Channel];
+  channelUpdate: [
+    old: import("../structures/Channel").Channel | null,
+    current: import("../structures/Channel").Channel,
+  ];
   channelDelete: [import("../structures/Channel").Channel];
   channelPinsUpdate: [ChannelPinsUpdateData];
   threadCreate: [import("../structures/ThreadChannel").ThreadChannel];
@@ -524,9 +528,13 @@ export class Client extends EventEmitter {
       }
       case "GUILD_UPDATE": {
         const existing = this.guilds.cache.get(d.id);
+        // _patch() mutates existing in place, so the pre-update scalars have
+        // to be captured now or they're unrecoverable by the time the event
+        // listener runs.
+        const old = existing ? { name: existing.name, icon: existing.icon, ownerId: existing.ownerId } : null;
         const guild = existing ? existing._patch(d as Partial<APIGuild>) : new Guild(this, d as APIGuild);
         this.guilds.cache.set(guild.id, guild);
-        this.emit("guildUpdate", guild);
+        this.emit("guildUpdate", old, guild);
         break;
       }
       case "GUILD_DELETE": {
@@ -552,10 +560,13 @@ export class Client extends EventEmitter {
       }
       case "GUILD_MEMBER_UPDATE": {
         const guild = this.guilds.cache.get(d.guild_id);
+        // _patchMember() replaces the cache entry rather than mutating it, so
+        // the previous Member instance is still intact if grabbed first.
+        const old = guild?.members.get(d.user.id) ?? null;
         const member = guild
           ? guild._patchMember(d.user.id, d as APIMember)
           : new Member(this, d.guild_id, d as APIMember);
-        this.emit("guildMemberUpdate", member);
+        this.emit("guildMemberUpdate", old, member);
         break;
       }
       case "GUILD_MEMBER_REMOVE": {
@@ -593,14 +604,18 @@ export class Client extends EventEmitter {
         break;
       }
       case "GUILD_ROLE_UPDATE": {
+        const guild = this.guilds.cache.get(d.guild_id);
+        const old = guild?.roles.get(d.role.id) ?? null;
         const role = new Role(this, d.guild_id, d.role as APIRole);
-        this.guilds.cache.get(d.guild_id)?.roles.set(role.id, role);
-        this.emit("roleUpdate", role);
+        guild?.roles.set(role.id, role);
+        this.emit("roleUpdate", old, role);
         break;
       }
       case "GUILD_ROLE_DELETE": {
-        this.guilds.cache.get(d.guild_id)?.roles.delete(d.role_id);
-        this.emit("roleDelete", { guildId: d.guild_id, roleId: d.role_id });
+        const guild = this.guilds.cache.get(d.guild_id);
+        const role = guild?.roles.get(d.role_id) ?? null;
+        guild?.roles.delete(d.role_id);
+        this.emit("roleDelete", role);
         break;
       }
 
@@ -613,10 +628,11 @@ export class Client extends EventEmitter {
         break;
       }
       case "CHANNEL_UPDATE": {
+        const old = this.channels.cache.get(d.id) ?? null;
         const channel = createChannel(this, d as APIChannel);
         this.channels.cache.set(channel.id, channel);
         if (channel.guildId) this.guilds.cache.get(channel.guildId)?.channels.set(channel.id, channel);
-        this.emit("channelUpdate", channel);
+        this.emit("channelUpdate", old, channel);
         break;
       }
       case "CHANNEL_DELETE": {
