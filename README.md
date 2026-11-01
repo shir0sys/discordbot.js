@@ -37,10 +37,10 @@ Runs the TypeScript build then the test suite with Node's built-in test runner (
 - `src/managers` — caches and REST-backed collections (`Collection`, `GuildMemberManager`, `RoleManager`, `MessageManager`, ...).
 - `src/builders` — `EmbedBuilder`, classic components (buttons/select menus), Components V2 layout components, modals, `SlashCommandBuilder`, `ContextMenuCommandBuilder`, `AttachmentBuilder`, `PollBuilder`.
 - `src/util` — bitfields (`PermissionsBitField`, `IntentsBitField`, ...), `Formatters`, `SnowflakeUtil`, color resolution, typed errors.
-- `src/voice` — voice gateway v8 client, UDP transport (IP discovery, RTP framing, AES-256-GCM encryption via `node:crypto`), `AudioPlayer`/`AudioResource`, and the `opusscript`-backed `OpusEncoder`.
+- `src/voice` — voice gateway client, UDP transport (IP discovery, RTP framing, AES-256-GCM encryption via `node:crypto`), `AudioPlayer`/`AudioResource`, and the `opusscript`-backed `OpusEncoder`.
 
 ## Scope and caveats
 
-- **Voice protocol correctness is untested against a live Discord voice server.** The gateway handshake, UDP IP discovery, RTP framing and AES-256-GCM encryption are implemented from Discord's written documentation and unit-tested for internal consistency (the crypto round-trips against Node's own AES-GCM, Opus encode/decode round-trips through real libopus), but exact byte-level agreement with Discord's servers has only been verified by inspection, not a real connection. Expect to debug it against a real bot/voice channel.
+- **Voice does not work on channels/guilds where Discord requires DAVE (end-to-end encryption).** Verified against a live voice server: the gateway handshake, UDP IP discovery and RTP/AES-256-GCM framing all work correctly, but Discord now mandates the DAVE protocol (an MLS-based end-to-end encryption scheme) for voice connections, which this library does not implement — it's a substantial protocol in its own right (group key ratcheting, epochs, proposals/commits), not a small addition. A connection attempt on a DAVE-required channel fails fast with a clear "E2EE/DAVE protocol required" error instead of hanging or crashing, but there is currently no way to actually join such a channel.
 - No voice *receive* (listening to other members) — send-only.
-- No automatic reconnection/resilience on voice gateway drops beyond a basic reconnect; no jitter buffering.
+- No automatic reconnection/resilience on voice gateway drops beyond a basic reconnect for genuinely transient close codes; no jitter buffering.
