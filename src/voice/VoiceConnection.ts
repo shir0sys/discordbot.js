@@ -265,11 +265,18 @@ export class VoiceConnection extends EventEmitter {
   private flushSilence(): void {
     const SILENCE_FRAME = Buffer.from([0xf8, 0xff, 0xfe]);
     const sendOne = () => {
-      if (this.silenceFramesRemaining <= 0 || !this.udp) {
+      // this.udp can go from a live socket to null between two 20ms-spaced
+      // timer ticks (e.g. stop() immediately followed by destroy()) — check
+      // status too, since a stale udp reference alone wouldn't catch that.
+      if (this.silenceFramesRemaining <= 0 || !this.udp || this.status === VoiceConnectionStatus.Destroyed) {
         if (this.ssrc !== null) this.gateway.sendSpeaking(this.ssrc, false);
         return;
       }
-      this.udp.sendOpusPacket(SILENCE_FRAME);
+      try {
+        this.udp.sendOpusPacket(SILENCE_FRAME);
+      } catch {
+        return; // socket already closed underneath us — nothing left to flush
+      }
       this.silenceFramesRemaining--;
       setTimeout(sendOne, 20).unref?.();
     };
@@ -279,6 +286,7 @@ export class VoiceConnection extends EventEmitter {
   public destroy(): void {
     this.gateway.destroy();
     this.udp?.close();
+    this.udp = null;
     this.status = VoiceConnectionStatus.Destroyed;
     this.emit("stateChange", this.status);
   }
