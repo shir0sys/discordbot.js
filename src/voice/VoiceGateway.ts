@@ -144,7 +144,12 @@ export class VoiceGateway extends EventEmitter {
 
   private sendBinary(buffer: Buffer): void {
     if (this.socket?.readyState !== WebSocket.OPEN) return;
-    this.socket.send(buffer);
+    // A plain Uint8Array<ArrayBuffer> rather than `buffer` directly: Buffer's
+    // underlying ArrayBufferLike can be a SharedArrayBuffer, which a strict
+    // WebSocket.send(BufferSource) signature (as some lib/@types
+    // combinations resolve to) rejects even though Node accepts a Buffer
+    // here at runtime regardless.
+    this.socket.send(new Uint8Array(buffer));
   }
 
   public sendSelectProtocol(address: string, port: number): void {
