@@ -36,6 +36,7 @@ export class Gateway extends EventEmitter {
   private socket: WebSocket | null = null;
   private heartbeatTimer: NodeJS.Timeout | null = null;
   private heartbeatAcked = true;
+  private lastMessageAt = 0;
   private sequence: number | null = null;
   private sessionId: string | null = null;
   private resumeGatewayUrl: string | null = null;
@@ -87,6 +88,7 @@ export class Gateway extends EventEmitter {
   }
 
   private onMessage(raw: string): void {
+    this.lastMessageAt = Date.now();
     const payload = JSON.parse(raw) as GatewayPayload;
     if (payload.s !== null) this.sequence = payload.s;
 
@@ -158,7 +160,19 @@ export class Gateway extends EventEmitter {
   private startHeartbeat(intervalMs: number): void {
     this.clearHeartbeat();
     this.heartbeatAcked = true;
+    this.lastMessageAt = Date.now();
     this.heartbeatTimer = setInterval(() => {
+      // A TCP connection can go half-open (the local socket thinks it's
+      // still writable, but nothing comes back) without ever surfacing a
+      // close event — the missed-ack check alone only catches that once a
+      // whole heartbeat round-trip has failed. Absolute silence (not even a
+      // dispatch) for more than two full intervals is a stronger, earlier
+      // signal of exactly that, so check it first.
+      if (Date.now() - this.lastMessageAt > intervalMs * 2) {
+        this.emit("debug", "no message received in over two heartbeat intervals, treating as zombie connection");
+        this.reconnect(true);
+        return;
+      }
       if (!this.heartbeatAcked) {
         // Missed ack: connection is stale, force a reconnect/resume cycle.
         this.reconnect(true);
