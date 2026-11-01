@@ -11,14 +11,27 @@ export enum VoiceOpcodes {
   Resumed = 9,
   ClientsConnect = 11,
   ClientDisconnect = 13,
+  // DAVE (end-to-end encryption) protocol opcodes. 21-24 and 31 are plain
+  // JSON like every other opcode here; 25-30 are raw binary WebSocket frames
+  // (an MLS message, prefixed by a 2-byte big-endian sequence number and a
+  // 1-byte opcode for the ones the server sends, see VoiceGateway.onMessage).
+  DavePrepareTransition = 21,
+  DaveExecuteTransition = 22,
+  DaveTransitionReady = 23,
+  DavePrepareEpoch = 24,
+  DaveMlsExternalSenderPackage = 25,
+  DaveMlsKeyPackage = 26,
+  DaveMlsProposals = 27,
+  DaveMlsCommitWelcome = 28,
+  DaveMlsAnnounceCommitTransition = 29,
+  DaveMlsWelcome = 30,
+  DaveMlsInvalidCommitWelcome = 31,
 }
 
-// Per Discord's own docs, v8 is merely the *recommended* version — v4 is
-// still accepted (only below v4 is rejected) and keeps the heartbeat as a
-// bare integer nonce instead of v8's {t, seq_ack} object, which this client
-// doesn't implement. DAVE negotiation (max_dave_protocol_version in
-// IDENTIFY, below) is independent of gateway version either way.
-export const VOICE_GATEWAY_VERSION = 4;
+// v8 is required for the DAVE opcodes above (21-31) and the sequence-number
+// based resume model they rely on; it also changes the heartbeat payload
+// shape to {t, seq_ack} instead of a bare integer nonce.
+export const VOICE_GATEWAY_VERSION = 8;
 
 /** The only mode this library speaks: AES-256-GCM is natively available via node:crypto, unlike the XSalsa20-Poly1305 modes. */
 export const ENCRYPTION_MODE = "aead_aes256_gcm_rtpsize";

@@ -55,6 +55,7 @@ export class VoiceUDP {
   private timestamp = 0;
   private nonceCounter = 0;
   private secretKey: Uint8Array | null = null;
+  private frameEncryptor: ((frame: Buffer) => Buffer) | null = null;
 
   constructor(
     private readonly ssrc: number,
@@ -64,6 +65,11 @@ export class VoiceUDP {
 
   public setSecretKey(key: Uint8Array): void {
     this.secretKey = key;
+  }
+
+  /** When set, every Opus frame is run through this (DAVE end-to-end encryption) before the usual transport-level RTP/AES-256-GCM framing — the two are independent layers. */
+  public setFrameEncryptor(encryptor: ((frame: Buffer) => Buffer) | null): void {
+    this.frameEncryptor = encryptor;
   }
 
   /** Discord's IP discovery packet: 74 bytes — 2 byte type, 2 byte length, 4 byte SSRC, 64 byte padded address, 2 byte port. */
@@ -102,13 +108,14 @@ export class VoiceUDP {
   public sendOpusPacket(opusFrame: Buffer): void {
     if (!this.secretKey) throw new Error("Cannot send audio before the session description (encryption key) arrives");
 
+    const frame = this.frameEncryptor ? this.frameEncryptor(opusFrame) : opusFrame;
     const packet = buildRtpPacket({
       sequence: this.sequence,
       timestamp: this.timestamp,
       ssrc: this.ssrc,
       nonceCounter: this.nonceCounter,
       secretKey: this.secretKey,
-      opusFrame,
+      opusFrame: frame,
     });
     this.socket.send(packet, this.remotePort, this.remoteIp);
 
