@@ -1,7 +1,7 @@
 import { EventEmitter } from "node:events";
 import { VoiceOpcodes, VOICE_GATEWAY_VERSION, ENCRYPTION_MODE } from "./VoiceConstants";
 
-const VOICE_CLOSE_CODE_REASONS: Record<number, string> = {
+export const VOICE_CLOSE_CODE_REASONS: Record<number, string> = {
   4001: "unknown opcode",
   4002: "failed to decode payload",
   4003: "not identified",
@@ -14,7 +14,18 @@ const VOICE_CLOSE_CODE_REASONS: Record<number, string> = {
   4014: "disconnected (kicked/moved from the channel)",
   4015: "voice server crashed",
   4016: "unknown encryption mode",
+  4017: "E2EE/DAVE protocol required — not implemented by this client",
+  4020: "malformed request",
+  4021: "rate limited",
+  4022: "call terminated",
 };
+
+// Reconnecting after these reproduces the identical rejection every time;
+// only unlisted codes (session timeouts, the server crashing, etc.) are
+// worth a blind retry.
+export const UNRECOVERABLE_VOICE_CLOSE_CODES = new Set([
+  4001, 4002, 4003, 4004, 4005, 4006, 4011, 4012, 4014, 4016, 4017, 4020, 4021, 4022,
+]);
 
 export interface VoiceGatewayOptions {
   endpoint: string;
@@ -190,9 +201,11 @@ export class VoiceGateway extends EventEmitter {
     );
     this.emit("close", code);
     if (this.destroyed) return;
-    // 4006 (session no longer valid) and 4014 (disconnected by Discord, e.g.
-    // moved/kicked) are not worth auto-reconnecting; everything else, retry.
-    if (code === 4006 || code === 4014) return;
+    // Retrying any of these just reproduces the exact same rejection forever
+    // (wrong/expired credentials, a channel/call that's gone, a mismatched
+    // encryption mode, or this client's complete lack of DAVE/E2EE support)
+    // — only genuinely transient closes are worth an automatic reconnect.
+    if (UNRECOVERABLE_VOICE_CLOSE_CODES.has(code)) return;
     setTimeout(() => this.connect(), 1000);
   }
 }

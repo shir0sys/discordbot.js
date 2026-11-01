@@ -1,5 +1,5 @@
 import { EventEmitter } from "node:events";
-import { VoiceGateway } from "./VoiceGateway";
+import { VoiceGateway, UNRECOVERABLE_VOICE_CLOSE_CODES, VOICE_CLOSE_CODE_REASONS } from "./VoiceGateway";
 import { VoiceUDP } from "./VoiceUDP";
 import type { AudioPlayer } from "./AudioPlayer";
 import { AudioPlayerStatus } from "./AudioPlayer";
@@ -67,7 +67,16 @@ export class VoiceConnection extends EventEmitter {
     gateway.on("debug", (message) => this.emit("debug", message));
     gateway.on("ready", (data) => this.onVoiceReady(data));
     gateway.on("sessionDescription", (data) => this.onSessionDescription(data));
-    gateway.on("close", (code) => this.emit("debug", `voice gateway closed: ${code}`));
+    gateway.on("close", (code) => {
+      this.emit("debug", `voice gateway closed: ${code}`);
+      if (UNRECOVERABLE_VOICE_CLOSE_CODES.has(code) && this.status !== VoiceConnectionStatus.Destroyed) {
+        this.emit(
+          "error",
+          new Error(`Voice connection closed (${code}): ${VOICE_CLOSE_CODE_REASONS[code] ?? "unrecoverable"}`),
+        );
+        this.destroy();
+      }
+    });
     return gateway;
   }
 
