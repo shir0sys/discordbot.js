@@ -65,4 +65,9 @@ export class Member extends Base {
   public async removeRole(roleId: string, reason?: string): Promise<void> {
     await this.client.rest.delete(`/guilds/${this.guildId}/members/${this.user?.id}/roles/${roleId}`, reason);
   }
+
+  public send(payload: import("./Message").MessagePayload): Promise<import("./Message").Message> {
+    if (!this.user) throw new Error("Cannot DM a member with no cached user data");
+    return this.user.send(payload);
+  }
 }

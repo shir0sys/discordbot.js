@@ -49,4 +49,18 @@ export class User extends Base {
   public toString(): string {
     return `<@${this.id}>`;
   }
+
+  /** Opens (or reuses, per Discord's own dedup) a DM channel with this user. */
+  public async createDM(): Promise<import("./DMChannel").DMChannel> {
+    const { DMChannel } = await import("./DMChannel");
+    const data = await this.client.rest.post<import("./Channel").APIChannel>("/users/@me/channels", {
+      recipient_id: this.id,
+    });
+    return new DMChannel(this.client, data);
+  }
+
+  public async send(payload: import("./Message").MessagePayload): Promise<import("./Message").Message> {
+    const dm = await this.createDM();
+    return dm.send(payload);
+  }
 }
