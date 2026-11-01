@@ -156,4 +156,20 @@ export class Message extends Base {
       collector.once("collect", (interaction) => resolve(interaction));
     });
   }
+
+  public async fetchPollAnswerVoters(
+    answerId: number,
+    options: { after?: string; limit?: number } = {},
+  ): Promise<User[]> {
+    const data = await this.client.rest.get<{ users: APIUser[] }>(
+      `/channels/${this.channelId}/polls/${this.id}/answers/${answerId}`,
+      { after: options.after, limit: options.limit },
+    );
+    return data.users.map((user) => new User(this.client, user));
+  }
+
+  public async expirePoll(): Promise<Message> {
+    const data = await this.client.rest.post<APIMessage>(`/channels/${this.channelId}/polls/${this.id}/expire`);
+    return new Message(this.client, data);
+  }
 }
