@@ -258,24 +258,43 @@ export class Client extends EventEmitter {
 
     const cleanups: (() => void)[] = [];
 
+    // Discord can send a second, corrected VOICE_STATE_UPDATE/VOICE_SERVER_UPDATE
+    // pair a moment after the first while the voice server assignment settles —
+    // identifying with the first pair's session_id/token can get invalidated by
+    // that second one arriving right after (close code 4006). Debounce briefly
+    // and always use the most recently received value of each.
+    const DEBOUNCE_MS = 300;
+
     const statePromise = new Promise<VoiceState>((resolve) => {
+      let latest: VoiceState | null = null;
+      let timer: ReturnType<typeof setTimeout> | null = null;
       const onState = (state: VoiceState) => {
-        if (state.guildId === guildId && state.userId === this.user!.id && state.channelId === channelId) {
-          resolve(state);
-        }
+        if (state.guildId !== guildId || state.userId !== this.user!.id || state.channelId !== channelId) return;
+        latest = state;
+        if (timer) clearTimeout(timer);
+        timer = setTimeout(() => resolve(latest!), DEBOUNCE_MS);
       };
       this.on("voiceStateUpdate", onState);
-      cleanups.push(() => this.off("voiceStateUpdate", onState));
+      cleanups.push(() => {
+        this.off("voiceStateUpdate", onState);
+        if (timer) clearTimeout(timer);
+      });
     });
 
     const serverPromise = new Promise<{ token: string; endpoint: string }>((resolve) => {
+      let latest: { token: string; endpoint: string } | null = null;
+      let timer: ReturnType<typeof setTimeout> | null = null;
       const onServer = (data: Record<string, any>) => {
-        if (data.guild_id === guildId) {
-          resolve({ token: data.token, endpoint: data.endpoint });
-        }
+        if (data.guild_id !== guildId) return;
+        latest = { token: data.token, endpoint: data.endpoint };
+        if (timer) clearTimeout(timer);
+        timer = setTimeout(() => resolve(latest!), DEBOUNCE_MS);
       };
       this.on("voiceServerUpdate", onServer);
-      cleanups.push(() => this.off("voiceServerUpdate", onServer));
+      cleanups.push(() => {
+        this.off("voiceServerUpdate", onServer);
+        if (timer) clearTimeout(timer);
+      });
     });
 
     this.shardFor(guildId).send(GatewayOpcodes.VoiceStateUpdate, {
