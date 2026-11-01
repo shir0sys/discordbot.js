@@ -110,6 +110,22 @@ export class ShardingManager extends EventEmitter {
     return this.broadcastEval<T>(`this.${prop}`);
   }
 
+  /**
+   * Finds which shard a guild's cache lives on — exactly one shard owns any
+   * given guild, so the first truthy result wins. Returns the shard id only
+   * (not the `Guild` itself: it holds a reference to its `Client`, which
+   * isn't serializable across the IPC channel broadcastEval uses) — follow
+   * up with your own `broadcastEval` selecting just the fields you need.
+   */
+  public async findGuild(guildId: string): Promise<number | null> {
+    const shardIds = [...this.shards.keys()];
+    const results = await Promise.all(
+      shardIds.map((shardId) => this.evalOnShard<boolean>(shardId, `this.guilds.cache.has("${guildId}")`)),
+    );
+    const index = results.findIndex(Boolean);
+    return index === -1 ? null : shardIds[index];
+  }
+
   public respawnAll(): void {
     for (const shardId of this.shards.keys()) this.shards.get(shardId)?.kill();
   }
