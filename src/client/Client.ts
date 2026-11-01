@@ -230,6 +230,7 @@ export class Client extends EventEmitter {
     if (!this.user) throw new Error("Cannot join a voice channel before the client is ready");
 
     const { guildId, channelId, selfMute = false, selfDeaf = false, timeout = 10000 } = options;
+    const joinStartedAt = Date.now();
 
     // A stale connection left over from a previous attempt that timed out
     // keeps its own voice gateway socket (and the session_id/token it was
@@ -280,6 +281,7 @@ export class Client extends EventEmitter {
       });
     });
 
+    this.emit("debug", `[voice] +0ms sending VoiceStateUpdate (join)`);
     this.shardFor(guildId).send(GatewayOpcodes.VoiceStateUpdate, {
       guild_id: guildId,
       channel_id: channelId,
@@ -301,6 +303,10 @@ export class Client extends EventEmitter {
     } finally {
       cleanups.forEach((cleanup) => cleanup());
     }
+    this.emit(
+      "debug",
+      `[voice] +${Date.now() - joinStartedAt}ms got state+server (endpoint=${server.endpoint}), constructing VoiceConnection`,
+    );
 
     const connection = new VoiceConnection({
       guildId,

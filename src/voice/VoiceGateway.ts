@@ -59,21 +59,30 @@ export class VoiceGateway extends EventEmitter {
   private sessionId: string | null = null;
   private serverSessionId: string | null = null;
   private destroyed = false;
+  private readonly createdAt = Date.now();
 
   constructor(private readonly options: VoiceGatewayOptions) {
     super();
+  }
+
+  // Temporary diagnostic: every debug line carries ms elapsed since this
+  // VoiceGateway was constructed, to rule out an unexpected delay anywhere
+  // in the handshake (e.g. DNS, TLS, or an internal queue) as the reason a
+  // session_id/token pair that looks valid still gets rejected with 4006.
+  private debug(message: string): void {
+    this.emit("debug", `+${Date.now() - this.createdAt}ms ${message}`);
   }
 
   public connect(): void {
     this.destroyed = false;
     const host = this.options.endpoint.replace(/:\d+$/, "");
     const url = `wss://${host}/?v=${VOICE_GATEWAY_VERSION}`;
-    this.emit("debug", `connecting to ${url} (raw endpoint: ${this.options.endpoint})`);
+    this.debug(`connecting to ${url} (raw endpoint: ${this.options.endpoint})`);
     this.socket = new WebSocket(url);
-    this.socket.addEventListener("open", () => this.emit("debug", "voice socket open"));
+    this.socket.addEventListener("open", () => this.debug("voice socket open"));
     this.socket.addEventListener("message", (event) => this.onMessage(event.data as string));
     this.socket.addEventListener("close", (event) => this.onClose(event.code, (event as CloseEvent).reason));
-    this.socket.addEventListener("error", (event) => this.emit("debug", `voice socket error: ${String(event)}`));
+    this.socket.addEventListener("error", (event) => this.debug(`voice socket error: ${String(event)}`));
   }
 
   public destroy(): void {
@@ -89,7 +98,7 @@ export class VoiceGateway extends EventEmitter {
   }
 
   public sendSelectProtocol(address: string, port: number): void {
-    this.emit("debug", `sending SELECT_PROTOCOL (${address}:${port}, mode=${ENCRYPTION_MODE})`);
+    this.debug(`sending SELECT_PROTOCOL (${address}:${port}, mode=${ENCRYPTION_MODE})`);
     this.send(VoiceOpcodes.SelectProtocol, {
       protocol: "udp",
       data: { address, port, mode: ENCRYPTION_MODE },
@@ -105,16 +114,17 @@ export class VoiceGateway extends EventEmitter {
 
     switch (payload.op) {
       case VoiceOpcodes.Hello:
+        this.debug(`voice HELLO received (heartbeat_interval=${payload.d.heartbeat_interval})`);
         this.startHeartbeat(payload.d.heartbeat_interval);
         this.emit("hello");
         this.identify();
         break;
       case VoiceOpcodes.Ready:
-        this.emit("debug", `voice READY, supported modes: ${payload.d.modes?.join(", ")}`);
+        this.debug(`voice READY, supported modes: ${payload.d.modes?.join(", ")}`);
         this.emit("ready", { ssrc: payload.d.ssrc, ip: payload.d.ip, port: payload.d.port, modes: payload.d.modes });
         break;
       case VoiceOpcodes.SessionDescription:
-        this.emit("debug", `voice SESSION_DESCRIPTION received (mode=${payload.d.mode})`);
+        this.debug(`voice SESSION_DESCRIPTION received (mode=${payload.d.mode})`);
         this.emit("sessionDescription", { mode: payload.d.mode, secretKey: Uint8Array.from(payload.d.secret_key) });
         break;
       case VoiceOpcodes.HeartbeatAck:
@@ -131,8 +141,7 @@ export class VoiceGateway extends EventEmitter {
     // IDENTIFY") to find out which one Discord is actually rejecting,
     // since 4006 gives no further detail. session_id/server_id/user_id
     // aren't secret; the token is shown truncated.
-    this.emit(
-      "debug",
+    this.debug(
       `sending voice IDENTIFY: server_id=${this.options.guildId} user_id=${this.options.userId} ` +
         `session_id=${this.options.sessionId} (len ${this.options.sessionId.length}) ` +
         `token=${this.options.token.slice(0, 8)}... (len ${this.options.token.length})`,
@@ -155,7 +164,7 @@ export class VoiceGateway extends EventEmitter {
     this.heartbeatAcked = true;
     this.heartbeatTimer = setInterval(() => {
       if (!this.heartbeatAcked) {
-        this.emit("debug", "voice heartbeat not acked, reconnecting");
+        this.debug("voice heartbeat not acked, reconnecting");
         this.socket?.close();
         return;
       }
@@ -172,8 +181,7 @@ export class VoiceGateway extends EventEmitter {
 
   private onClose(code: number, reason?: string): void {
     this.clearHeartbeat();
-    this.emit(
-      "debug",
+    this.debug(
       `voice socket closed: ${code} (${VOICE_CLOSE_CODE_REASONS[code] ?? "unknown"})${reason ? ` — reason: ${reason}` : ""}`,
     );
     this.emit("close", code);
