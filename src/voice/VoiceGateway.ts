@@ -78,6 +78,8 @@ type VoiceGatewayEvents = {
   daveExecuteTransition: [{ transitionId: number }];
   clientsConnect: [string[]];
   clientDisconnect: [string];
+  /** The only way to learn which SSRC (the RTP sender id in every received packet) belongs to which user — broadcast whenever that user starts or stops speaking. */
+  speaking: [{ ssrc: number; userId: string; speaking: boolean }];
 };
 
 /**
@@ -223,6 +225,13 @@ export class VoiceGateway extends EventEmitter {
         break;
       case VoiceOpcodes.Resumed:
         this.emit("resumed");
+        break;
+      case VoiceOpcodes.Speaking:
+        this.emit("speaking", {
+          ssrc: payload.d.ssrc,
+          userId: payload.d.user_id,
+          speaking: Boolean(payload.d.speaking),
+        });
         break;
       case VoiceOpcodes.ClientsConnect:
         this.emit("clientsConnect", payload.d.user_ids ?? []);

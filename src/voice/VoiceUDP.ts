@@ -1,9 +1,17 @@
+import { EventEmitter } from "node:events";
 import * as dgram from "node:dgram";
-import { createCipheriv } from "node:crypto";
+import { createCipheriv, createDecipheriv } from "node:crypto";
 
 export interface IPDiscoveryResult {
   address: string;
   port: number;
+}
+
+export interface DecryptedRtpPacket {
+  ssrc: number;
+  sequence: number;
+  timestamp: number;
+  payload: Buffer;
 }
 
 /**
@@ -45,11 +53,51 @@ export function buildRtpPacket(params: {
 }
 
 /**
- * Raw UDP transport for one voice connection: IP discovery, RTP framing,
- * and aead_aes256_gcm_rtpsize encryption. Send-only — this library plays
- * audio into a channel, it doesn't currently decode what other members send.
+ * Reverses buildRtpPacket(): same header/ciphertext/auth-tag/nonce-suffix
+ * layout, so this only correctly decodes packets using that exact framing.
+ * Real Discord clients can prepend a one-byte RTP header extension (profile
+ * 0xBEDE) before the Opus payload for things like silence/video signaling —
+ * unhandled here, so packets using one fail the auth tag check and come
+ * back null rather than being misparsed. Verified only by round-tripping
+ * against buildRtpPacket's own output, not against real client traffic.
  */
-export class VoiceUDP {
+export function decryptRtpPacket(params: { packet: Buffer; secretKey: Uint8Array }): DecryptedRtpPacket | null {
+  const { packet, secretKey } = params;
+  if (packet.length < 12 + 16 + 4) return null;
+
+  const header = packet.subarray(0, 12);
+  const sequence = header.readUInt16BE(2);
+  const timestamp = header.readUInt32BE(4);
+  const ssrc = header.readUInt32BE(8);
+
+  const nonceCounter = packet.readUInt32BE(packet.length - 4);
+  const authTag = packet.subarray(packet.length - 4 - 16, packet.length - 4);
+  const ciphertext = packet.subarray(12, packet.length - 4 - 16);
+
+  const nonce = Buffer.alloc(12);
+  nonce.writeUInt32BE(nonceCounter, 0);
+
+  try {
+    const decipher = createDecipheriv("aes-256-gcm", secretKey as Uint8Array, nonce);
+    decipher.setAAD(header);
+    decipher.setAuthTag(authTag);
+    const payload = Buffer.concat([decipher.update(ciphertext), decipher.final()]);
+    return { ssrc, sequence, timestamp, payload };
+  } catch {
+    return null;
+  }
+}
+
+type VoiceUDPEvents = {
+  /** One decrypted Opus frame from another member — still DAVE-encrypted if the call has E2EE active, see VoiceConnection. */
+  packet: [DecryptedRtpPacket];
+};
+
+/**
+ * Raw UDP transport for one voice connection: IP discovery, RTP framing,
+ * and aead_aes256_gcm_rtpsize encryption, both directions.
+ */
+export class VoiceUDP extends EventEmitter {
   private readonly socket = dgram.createSocket("udp4");
   private sequence = 0;
   private timestamp = 0;
@@ -61,10 +109,22 @@ export class VoiceUDP {
     private readonly ssrc: number,
     private readonly remoteIp: string,
     private readonly remotePort: number,
-  ) {}
+  ) {
+    super();
+    this.socket.on("message", (message) => this.onPacket(message));
+  }
 
   public setSecretKey(key: Uint8Array): void {
     this.secretKey = key;
+  }
+
+  /** The IP discovery response (type 0x0002) and any pre-encryption garbage both fail these checks harmlessly; only real RTP audio packets reach decryptRtpPacket. */
+  private onPacket(message: Buffer): void {
+    if (message.length < 12 || message[0] !== 0x80) return;
+    if (!this.secretKey) return;
+
+    const decoded = decryptRtpPacket({ packet: message, secretKey: this.secretKey });
+    if (decoded) this.emit("packet", decoded);
   }
 
   /** When set, every Opus frame is run through this (DAVE end-to-end encryption) before the usual transport-level RTP/AES-256-GCM framing — the two are independent layers. */
@@ -127,4 +187,9 @@ export class VoiceUDP {
   public close(): void {
     this.socket.close();
   }
+}
+
+export interface VoiceUDP {
+  on<K extends keyof VoiceUDPEvents>(event: K, listener: (...args: VoiceUDPEvents[K]) => void): this;
+  emit<K extends keyof VoiceUDPEvents>(event: K, ...args: VoiceUDPEvents[K]): boolean;
 }

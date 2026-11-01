@@ -1,7 +1,7 @@
 const { test } = require("node:test");
 const assert = require("node:assert/strict");
 const { createDecipheriv, randomBytes } = require("node:crypto");
-const { buildRtpPacket } = require("../dist/voice/VoiceUDP");
+const { buildRtpPacket, decryptRtpPacket } = require("../dist/voice/VoiceUDP");
 const { OpusEncoder, PCM_FRAME_BYTES } = require("../dist/voice/OpusEncoder");
 const { DaveSession } = require("../dist/voice/DaveSession");
 const { DAVE_PROTOCOL_VERSION } = require("@snazzah/davey");
@@ -75,6 +75,33 @@ test("buildRtpPacket rejects tampered ciphertext (GCM auth tag actually protects
     decipher.update(ciphertext);
     decipher.final();
   });
+});
+
+test("decryptRtpPacket reverses buildRtpPacket exactly", () => {
+  const secretKey = randomBytes(32);
+  const opusFrame = randomBytes(40);
+
+  const packet = buildRtpPacket({
+    sequence: 1234,
+    timestamp: 48000,
+    ssrc: 999,
+    nonceCounter: 5,
+    secretKey,
+    opusFrame,
+  });
+
+  const decoded = decryptRtpPacket({ packet, secretKey });
+  assert.ok(decoded, "a packet built by buildRtpPacket should always decode");
+  assert.equal(decoded.ssrc, 999);
+  assert.equal(decoded.sequence, 1234);
+  assert.equal(decoded.timestamp, 48000);
+  assert.deepEqual(decoded.payload, opusFrame);
+});
+
+test("decryptRtpPacket returns null instead of throwing on garbage input", () => {
+  const secretKey = randomBytes(32);
+  assert.equal(decryptRtpPacket({ packet: Buffer.alloc(40), secretKey }), null);
+  assert.equal(decryptRtpPacket({ packet: Buffer.alloc(4), secretKey }), null);
 });
 
 test("OpusEncoder round-trips silence through real libopus (via opusscript)", () => {

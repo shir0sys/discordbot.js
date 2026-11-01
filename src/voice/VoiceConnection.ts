@@ -1,6 +1,6 @@
 import { EventEmitter } from "node:events";
 import { VoiceGateway, UNRECOVERABLE_VOICE_CLOSE_CODES, VOICE_CLOSE_CODE_REASONS } from "./VoiceGateway";
-import { VoiceUDP } from "./VoiceUDP";
+import { VoiceUDP, type DecryptedRtpPacket } from "./VoiceUDP";
 import { DaveSession } from "./DaveSession";
 import type { AudioPlayer } from "./AudioPlayer";
 import { AudioPlayerStatus } from "./AudioPlayer";
@@ -24,6 +24,8 @@ type VoiceConnectionEvents = {
   stateChange: [VoiceConnectionStatus];
   error: [Error];
   debug: [string];
+  /** One decoded-from-transport Opus frame from another member, already past DAVE decryption when the call has E2EE active — still Opus, not PCM; decode with OpusEncoder if you need raw audio. */
+  audioPacket: [{ userId: string; opusFrame: Buffer }];
 };
 
 /** One voice channel connection: owns the voice gateway handshake, the UDP transport, and whatever AudioPlayer is subscribed to it. */
@@ -43,6 +45,7 @@ export class VoiceConnection extends EventEmitter {
   private status: VoiceConnectionStatus = VoiceConnectionStatus.Connecting;
   private silenceFramesRemaining = 0;
   private dave: DaveSession | null = null;
+  private readonly ssrcToUserId = new Map<number, string>();
   // Binary DAVE events (external sender, proposals, commit/welcome) can in
   // principle arrive before SESSION_DESCRIPTION tells us the negotiated
   // dave_protocol_version and lets us construct the DaveSession — queue
@@ -111,6 +114,13 @@ export class VoiceConnection extends EventEmitter {
       // prepare_epoch, or the connection is torn down.
     });
 
+    gateway.on("speaking", ({ ssrc, userId }) => this.ssrcToUserId.set(ssrc, userId));
+    gateway.on("clientDisconnect", (userId) => {
+      for (const [ssrc, id] of this.ssrcToUserId) {
+        if (id === userId) this.ssrcToUserId.delete(ssrc);
+      }
+    });
+
     return gateway;
   }
 
@@ -150,6 +160,7 @@ export class VoiceConnection extends EventEmitter {
   private async onVoiceReady(data: { ssrc: number; ip: string; port: number }): Promise<void> {
     this.ssrc = data.ssrc;
     this.udp = new VoiceUDP(data.ssrc, data.ip, data.port);
+    this.udp.on("packet", (packet) => this.handleIncomingPacket(packet));
     this.emit("debug", `voice ready (ssrc=${data.ssrc}, ${data.ip}:${data.port}), starting UDP IP discovery`);
     try {
       const discovered = await this.udp.discoverIP();
@@ -164,6 +175,30 @@ export class VoiceConnection extends EventEmitter {
       this.emit("debug", `UDP IP discovery failed: ${(error as Error).message}`);
       this.destroy();
     }
+  }
+
+  /**
+   * SSRCs are only ever introduced via the gateway's Speaking broadcast, so a
+   * packet for one we haven't seen yet (e.g. it arrives a moment before that
+   * broadcast does) is dropped rather than guessed at. With DAVE active, the
+   * transport layer only gets us back to the still-end-to-end-encrypted
+   * frame — decryptOpus() is what actually recovers the sender's Opus bytes.
+   */
+  private handleIncomingPacket(packet: DecryptedRtpPacket): void {
+    const userId = this.ssrcToUserId.get(packet.ssrc);
+    if (!userId) return;
+
+    let opusFrame = packet.payload;
+    if (this.dave) {
+      try {
+        opusFrame = this.dave.decryptOpus(userId, packet.payload);
+      } catch (error) {
+        this.emit("debug", `DAVE decrypt failed for ${userId}: ${(error as Error).message}`);
+        return;
+      }
+    }
+
+    this.emit("audioPacket", { userId, opusFrame });
   }
 
   private onSessionDescription(data: { secretKey: Uint8Array; daveProtocolVersion: number }): void {

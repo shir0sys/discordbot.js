@@ -1,5 +1,5 @@
 import { EventEmitter } from "node:events";
-import { DAVESession, type ProposalsResult } from "@snazzah/davey";
+import { DAVESession, MediaType, type ProposalsResult } from "@snazzah/davey";
 
 type DaveSessionEvents = {
   sendKeyPackage: [Buffer];
@@ -108,6 +108,11 @@ export class DaveSession extends EventEmitter {
 
   public encryptOpus(frame: Buffer): Buffer {
     return this.session.encryptOpus(frame);
+  }
+
+  /** Reverses encryptOpus() for a specific sender — DAVE derives independent per-sender keys, so the user id isn't optional. */
+  public decryptOpus(userId: string, packet: Buffer): Buffer {
+    return this.session.decrypt(userId, MediaType.AUDIO, packet);
   }
 }
 
