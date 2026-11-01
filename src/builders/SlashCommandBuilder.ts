@@ -10,6 +10,7 @@ export interface SlashCommandOptionData {
   min_value?: number;
   max_value?: number;
   channel_types?: number[];
+  autocomplete?: boolean;
 }
 
 export interface OptionConfig {
@@ -18,6 +19,8 @@ export interface OptionConfig {
   minValue?: number;
   maxValue?: number;
   channelTypes?: number[];
+  /** Mutually exclusive with `choices` per Discord's own rules — setting both is rejected at registration time, not here. */
+  autocomplete?: boolean;
 }
 
 /** Builds a chat-input (slash) command payload for /applications/{id}/commands. */
@@ -27,6 +30,11 @@ export class SlashCommandBuilder {
   private options: SlashCommandOptionData[] = [];
   private dmPermission?: boolean;
   private defaultMemberPermissions?: string;
+  private nsfwFlag?: boolean;
+  private nameLocalizations?: Record<string, string>;
+  private descriptionLocalizations?: Record<string, string>;
+  private integrationTypes?: number[];
+  private contexts?: number[];
 
   public setName(name: string): this {
     this.name = name;
@@ -48,6 +56,33 @@ export class SlashCommandBuilder {
     return this;
   }
 
+  public setNSFW(nsfw: boolean): this {
+    this.nsfwFlag = nsfw;
+    return this;
+  }
+
+  public setNameLocalizations(localizations: Record<string, string>): this {
+    this.nameLocalizations = localizations;
+    return this;
+  }
+
+  public setDescriptionLocalizations(localizations: Record<string, string>): this {
+    this.descriptionLocalizations = localizations;
+    return this;
+  }
+
+  /** Where the command can be installed: 0 = guild install, 1 = user install. */
+  public setIntegrationTypes(types: number[]): this {
+    this.integrationTypes = types;
+    return this;
+  }
+
+  /** Where the command can be invoked: 0 = guild, 1 = bot DM, 2 = private channel. Supersedes setDMPermission on new installs. */
+  public setContexts(contexts: number[]): this {
+    this.contexts = contexts;
+    return this;
+  }
+
   private addOption(
     type: ApplicationCommandOptionType,
     name: string,
@@ -63,6 +98,7 @@ export class SlashCommandBuilder {
       min_value: config.minValue,
       max_value: config.maxValue,
       channel_types: config.channelTypes,
+      autocomplete: config.autocomplete,
     });
     return this;
   }
@@ -117,6 +153,11 @@ export class SlashCommandBuilder {
       options: this.options.length ? this.options : undefined,
       dm_permission: this.dmPermission,
       default_member_permissions: this.defaultMemberPermissions,
+      nsfw: this.nsfwFlag,
+      name_localizations: this.nameLocalizations,
+      description_localizations: this.descriptionLocalizations,
+      integration_types: this.integrationTypes,
+      contexts: this.contexts,
     };
   }
 }
