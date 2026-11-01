@@ -13,7 +13,12 @@ export enum VoiceOpcodes {
   ClientDisconnect = 13,
 }
 
-export const VOICE_GATEWAY_VERSION = 8;
+// v8 ties the handshake to the DAVE (end-to-end encryption) protocol, which
+// this library doesn't implement — sessions were consistently closing with
+// 4006 right after IDENTIFY. v4 is the long-standing stable version with the
+// plain Identify -> Ready -> Select Protocol -> Session Description flow
+// this client actually speaks.
+export const VOICE_GATEWAY_VERSION = 4;
 
 /** The only mode this library speaks: AES-256-GCM is natively available via node:crypto, unlike the XSalsa20-Poly1305 modes. */
 export const ENCRYPTION_MODE = "aead_aes256_gcm_rtpsize";
