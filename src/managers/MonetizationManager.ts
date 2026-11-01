@@ -1,8 +1,12 @@
 import { SKU, type APISKU } from "../structures/SKU";
 import { Entitlement, type APIEntitlement } from "../structures/Entitlement";
+import { Collection } from "./Collection";
 import type { Client } from "../client/Client";
 
 export class MonetizationManager {
+  /** Populated by ENTITLEMENT_CREATE/UPDATE/DELETE dispatches — fetchEntitlements() below doesn't touch it, since that's an explicit filtered query, not a cache refresh. */
+  public readonly cache = new Collection<string, Entitlement>();
+
   constructor(private readonly client: Client) {}
 
   private appId(): string {
