@@ -41,6 +41,7 @@
     "typescript-eslint": "^8.0.0"
   },
   "dependencies": {
+    "@snazzah/davey": "^0.1.12",
     "opusscript": "^0.1.1"
   },
   "keywords": [
