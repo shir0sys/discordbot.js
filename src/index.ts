@@ -171,6 +171,7 @@ export {
   type VoiceSessionDescription,
 } from "./voice/VoiceGateway";
 export { VoiceUDP, buildRtpPacket, type IPDiscoveryResult } from "./voice/VoiceUDP";
+export { DaveSession } from "./voice/DaveSession";
 export { AudioPlayer, AudioPlayerStatus } from "./voice/AudioPlayer";
 export { AudioResource } from "./voice/AudioResource";
 export { OpusEncoder, PCM_FRAME_BYTES } from "./voice/OpusEncoder";
