@@ -3,6 +3,8 @@ const assert = require("node:assert/strict");
 const { createDecipheriv, randomBytes } = require("node:crypto");
 const { buildRtpPacket } = require("../dist/voice/VoiceUDP");
 const { OpusEncoder, PCM_FRAME_BYTES } = require("../dist/voice/OpusEncoder");
+const { DaveSession } = require("../dist/voice/DaveSession");
+const { DAVE_PROTOCOL_VERSION } = require("@snazzah/davey");
 
 test("buildRtpPacket produces a header Discord can parse and a payload Node's own AES-256-GCM can decrypt", () => {
   const secretKey = randomBytes(32);
@@ -86,4 +88,33 @@ test("OpusEncoder round-trips silence through real libopus (via opusscript)", ()
   assert.equal(decoded.length, PCM_FRAME_BYTES);
 
   encoder.destroy();
+});
+
+test("DaveSession submits a key package on start() and stays not-ready until a group is established", () => {
+  const session = new DaveSession(DAVE_PROTOCOL_VERSION, "1234567890123456789", "9876543210987654321");
+  assert.equal(session.ready, false);
+
+  let keyPackage = null;
+  session.on("sendKeyPackage", (buf) => (keyPackage = buf));
+  session.start();
+
+  assert.ok(Buffer.isBuffer(keyPackage), "start() should emit a serialized MLS key package");
+  assert.ok(keyPackage.length > 0);
+  assert.equal(session.ready, false, "a lone key package doesn't establish a group by itself");
+});
+
+test("DaveSession reports processProposals/processCommit/processWelcome failures via 'debug' instead of throwing", () => {
+  const session = new DaveSession(DAVE_PROTOCOL_VERSION, "1234567890123456789", "9876543210987654321");
+  session.start();
+
+  const debugMessages = [];
+  session.on("debug", (message) => debugMessages.push(message));
+  session.on("sendInvalidCommitWelcome", () => {});
+
+  assert.doesNotThrow(() => session.handleProposals(0, Buffer.from([1, 2, 3])));
+  assert.doesNotThrow(() => session.handleAnnounceCommitTransition(1, Buffer.from([1, 2, 3])));
+  assert.doesNotThrow(() => session.handleWelcome(1, Buffer.from([1, 2, 3])));
+  assert.ok(debugMessages.some((message) => message.includes("processProposals failed")));
+  assert.ok(debugMessages.some((message) => message.includes("processCommit failed")));
+  assert.ok(debugMessages.some((message) => message.includes("processWelcome failed")));
 });
