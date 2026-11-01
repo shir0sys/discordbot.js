@@ -2,6 +2,7 @@ import { Base } from "./Base";
 import { User, type APIUser } from "./User";
 import { PermissionsBitField } from "../util/Permissions";
 import type { Channel } from "./Channel";
+import type { Role } from "./Role";
 import type { Client } from "../client/Client";
 
 export interface APIMember {
@@ -52,6 +53,56 @@ export class Member extends Base {
   public permissionsIn(channel: Channel): PermissionsBitField {
     if (!this.user) return this.permissions;
     return channel.permissionsFor(this.permissions, this.user.id, this.roleIds);
+  }
+
+  /** The highest-position role this member holds, or null if they have none beyond @everyone (which isn't in roleIds). */
+  public get highestRole(): Role | null {
+    const guild = this.client.guilds.cache.get(this.guildId);
+    if (!guild) return null;
+
+    let highest: Role | null = null;
+    for (const roleId of this.roleIds) {
+      const role = guild.roles.get(roleId);
+      if (role && (!highest || role.position > highest.position)) highest = role;
+    }
+    return highest;
+  }
+
+  /**
+   * Whether the bot's own role hierarchy outranks this member, which Discord
+   * requires for kick/ban/timeout/role-edit regardless of raw permission
+   * bits. The guild owner can never be outranked this way and is only
+   * moderatable by itself. Requires the guild and the bot's own member to be
+   * cached.
+   */
+  public get moderatable(): boolean {
+    const guild = this.client.guilds.cache.get(this.guildId);
+    const selfId = this.client.user?.id;
+    if (!guild || !this.user || !selfId) return false;
+    if (this.user.id === selfId) return false;
+    if (guild.ownerId === this.user.id) return false;
+    if (guild.ownerId === selfId) return true;
+
+    const me = guild.members.get(selfId);
+    if (!me) return false;
+
+    return (me.highestRole?.position ?? 0) > (this.highestRole?.position ?? 0);
+  }
+
+  /** Whether the bot can kick this member: outranks them AND holds KickMembers. */
+  public get kickable(): boolean {
+    const guild = this.client.guilds.cache.get(this.guildId);
+    const selfId = this.client.user?.id;
+    const me = selfId ? guild?.members.get(selfId) : undefined;
+    return this.moderatable && (me?.permissions.has(["KickMembers"]) ?? false);
+  }
+
+  /** Whether the bot can ban this member: outranks them AND holds BanMembers. */
+  public get bannable(): boolean {
+    const guild = this.client.guilds.cache.get(this.guildId);
+    const selfId = this.client.user?.id;
+    const me = selfId ? guild?.members.get(selfId) : undefined;
+    return this.moderatable && (me?.permissions.has(["BanMembers"]) ?? false);
   }
 
   public async kick(reason?: string): Promise<void> {
