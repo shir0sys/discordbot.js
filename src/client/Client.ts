@@ -31,6 +31,9 @@ import { GuildBan, type APIBan } from "../structures/GuildBan";
 import { Invite, type APIInvite, type PartialInvite } from "../structures/Invite";
 import { Presence, type APIPresence } from "../structures/Presence";
 import { VoiceConnection, VoiceConnectionStatus } from "../voice/VoiceConnection";
+import { Application, type APIApplication } from "../structures/Application";
+import { StickerPack, type APIStickerPack } from "../structures/StickerPack";
+import { Entitlement, type APIEntitlement } from "../structures/Entitlement";
 import type { APIChannel } from "../structures/Channel";
 
 export interface TypingStartData {
@@ -157,6 +160,9 @@ type ClientEvents = {
   autoModerationRuleUpdate: [AutoModerationRule];
   autoModerationRuleDelete: [AutoModerationRule];
   autoModerationActionExecution: [Record<string, unknown>];
+  entitlementCreate: [Entitlement];
+  entitlementUpdate: [Entitlement];
+  entitlementDelete: [Entitlement];
   interactionCreate: [Interaction];
 };
 
@@ -360,6 +366,16 @@ export class Client extends EventEmitter {
     }
 
     return connection;
+  }
+
+  public async fetchApplication(): Promise<Application> {
+    const data = await this.rest.get<APIApplication>("/applications/@me");
+    return new Application(this, data);
+  }
+
+  public async fetchStickerPacks(): Promise<StickerPack[]> {
+    const data = await this.rest.get<{ sticker_packs: APIStickerPack[] }>("/sticker-packs");
+    return data.sticker_packs.map((pack) => new StickerPack(this, pack));
   }
 
   public leaveVoiceChannel(guildId: string): void {
@@ -692,29 +708,67 @@ export class Client extends EventEmitter {
         break;
 
       // Scheduled events
-      case "GUILD_SCHEDULED_EVENT_CREATE":
-        this.emit("guildScheduledEventCreate", new GuildScheduledEvent(this, d as APIGuildScheduledEvent));
+      case "GUILD_SCHEDULED_EVENT_CREATE": {
+        const event = new GuildScheduledEvent(this, d as APIGuildScheduledEvent);
+        this.guilds.cache.get(event.guildId)?.scheduledEvents.set(event.id, event);
+        this.emit("guildScheduledEventCreate", event);
         break;
-      case "GUILD_SCHEDULED_EVENT_UPDATE":
-        this.emit("guildScheduledEventUpdate", new GuildScheduledEvent(this, d as APIGuildScheduledEvent));
+      }
+      case "GUILD_SCHEDULED_EVENT_UPDATE": {
+        const event = new GuildScheduledEvent(this, d as APIGuildScheduledEvent);
+        this.guilds.cache.get(event.guildId)?.scheduledEvents.set(event.id, event);
+        this.emit("guildScheduledEventUpdate", event);
         break;
-      case "GUILD_SCHEDULED_EVENT_DELETE":
-        this.emit("guildScheduledEventDelete", new GuildScheduledEvent(this, d as APIGuildScheduledEvent));
+      }
+      case "GUILD_SCHEDULED_EVENT_DELETE": {
+        const event = new GuildScheduledEvent(this, d as APIGuildScheduledEvent);
+        this.guilds.cache.get(event.guildId)?.scheduledEvents.delete(event.id);
+        this.emit("guildScheduledEventDelete", event);
         break;
+      }
 
       // Auto moderation
-      case "AUTO_MODERATION_RULE_CREATE":
-        this.emit("autoModerationRuleCreate", new AutoModerationRule(this, d as APIAutoModerationRule));
+      case "AUTO_MODERATION_RULE_CREATE": {
+        const rule = new AutoModerationRule(this, d as APIAutoModerationRule);
+        this.guilds.cache.get(rule.guildId)?.autoModerationRules.set(rule.id, rule);
+        this.emit("autoModerationRuleCreate", rule);
         break;
-      case "AUTO_MODERATION_RULE_UPDATE":
-        this.emit("autoModerationRuleUpdate", new AutoModerationRule(this, d as APIAutoModerationRule));
+      }
+      case "AUTO_MODERATION_RULE_UPDATE": {
+        const rule = new AutoModerationRule(this, d as APIAutoModerationRule);
+        this.guilds.cache.get(rule.guildId)?.autoModerationRules.set(rule.id, rule);
+        this.emit("autoModerationRuleUpdate", rule);
         break;
-      case "AUTO_MODERATION_RULE_DELETE":
-        this.emit("autoModerationRuleDelete", new AutoModerationRule(this, d as APIAutoModerationRule));
+      }
+      case "AUTO_MODERATION_RULE_DELETE": {
+        const rule = new AutoModerationRule(this, d as APIAutoModerationRule);
+        this.guilds.cache.get(rule.guildId)?.autoModerationRules.delete(rule.id);
+        this.emit("autoModerationRuleDelete", rule);
         break;
+      }
       case "AUTO_MODERATION_ACTION_EXECUTION":
         this.emit("autoModerationActionExecution", d);
         break;
+
+      // Monetization
+      case "ENTITLEMENT_CREATE": {
+        const entitlement = new Entitlement(this, d as APIEntitlement);
+        this.monetization.cache.set(entitlement.id, entitlement);
+        this.emit("entitlementCreate", entitlement);
+        break;
+      }
+      case "ENTITLEMENT_UPDATE": {
+        const entitlement = new Entitlement(this, d as APIEntitlement);
+        this.monetization.cache.set(entitlement.id, entitlement);
+        this.emit("entitlementUpdate", entitlement);
+        break;
+      }
+      case "ENTITLEMENT_DELETE": {
+        const entitlement = new Entitlement(this, d as APIEntitlement);
+        this.monetization.cache.delete(entitlement.id);
+        this.emit("entitlementDelete", entitlement);
+        break;
+      }
 
       case "INTERACTION_CREATE": {
         const interaction = this.createInteraction(d as APIInteraction);
