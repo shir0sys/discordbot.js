@@ -45,7 +45,13 @@ export {
   ApplicationCommandManager,
   type ApplicationCommandData,
   type CommandInput,
+  type APIApplicationCommand,
+  type APICommandPermission,
+  type APIGuildApplicationCommandPermissions,
 } from "./managers/ApplicationCommandManager";
+export { GuildApplicationCommandManager } from "./managers/GuildApplicationCommandManager";
+export { AutoModerationRuleManager, type AutoModerationRuleCreateData } from "./managers/AutoModerationRuleManager";
+export { GuildScheduledEventManager, type GuildScheduledEventCreateData } from "./managers/GuildScheduledEventManager";
 
 export { Base } from "./structures/Base";
 export { User, type APIUser } from "./structures/User";
@@ -94,6 +100,9 @@ export {
 export { SoundboardSound, type APISoundboardSound } from "./structures/SoundboardSound";
 export { SKU, type APISKU } from "./structures/SKU";
 export { Entitlement, type APIEntitlement } from "./structures/Entitlement";
+export { Application, type APIApplication, type APIApplicationRoleConnectionMetadata } from "./structures/Application";
+export { StickerPack, type APIStickerPack } from "./structures/StickerPack";
+export { ApplicationCommand, ApplicationCommandPermissions } from "./structures/ApplicationCommand";
 export {
   Presence,
   Activity,
