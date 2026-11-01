@@ -115,7 +115,7 @@ type ClientEvents = {
   error: [import("../util/Errors").GatewayError];
   messageCreate: [Message];
   messageUpdate: [PartialMessageUpdate];
-  messageDelete: [{ id: string; channelId: string; guildId: string | null }];
+  messageDelete: [{ id: string; channelId: string; guildId: string | null; message: Message | null }];
   messageDeleteBulk: [{ ids: string[]; channelId: string; guildId: string | null }];
   messageReactionAdd: [MessageReactionEventData];
   messageReactionRemove: [MessageReactionEventData];
@@ -124,8 +124,19 @@ type ClientEvents = {
   messagePollVoteAdd: [PollVoteData];
   messagePollVoteRemove: [PollVoteData];
   guildCreate: [Guild];
-  /** The "old" snapshot only carries the handful of scalar fields GUILD_UPDATE actually changes (name/icon/ownerId) — Guild._patch() mutates the cached instance in place, so anything not captured here is already gone by the time this fires. */
-  guildUpdate: [old: { name: string; icon: string | null; ownerId: string } | null, current: Guild];
+  /** The "old" snapshot only carries the scalar fields GUILD_UPDATE can change — Guild._patch() mutates the cached instance in place, so anything not captured here is already gone by the time this fires. */
+  guildUpdate: [
+    old: {
+      name: string;
+      icon: string | null;
+      ownerId: string;
+      verificationLevel: number;
+      afkChannelId: string | null;
+      afkTimeout: number;
+      mfaLevel: number;
+    } | null,
+    current: Guild,
+  ];
   guildDelete: [{ id: string; unavailable: boolean }];
   guildMemberAdd: [Member];
   guildMemberRemove: [{ guildId: string; user: User }];
@@ -461,10 +472,18 @@ export class Client extends EventEmitter {
         break;
 
       // Messages
-      case "MESSAGE_CREATE":
-        this.emit("messageCreate", new Message(this, d as APIMessage));
+      case "MESSAGE_CREATE": {
+        const message = new Message(this, d as APIMessage);
+        const channel = this.channels.cache.get(message.channelId);
+        if (channel?.isText()) channel.messages.set(message.id, message);
+        this.emit("messageCreate", message);
         break;
-      case "MESSAGE_UPDATE":
+      }
+      case "MESSAGE_UPDATE": {
+        const channel = this.channels.cache.get(d.channel_id);
+        const cached = channel?.isText() ? channel.messages.get(d.id) : undefined;
+        if (cached && d.content !== undefined) cached.content = d.content;
+        if (cached && d.edited_timestamp) cached.editedTimestamp = Date.parse(d.edited_timestamp);
         this.emit("messageUpdate", {
           id: d.id,
           channelId: d.channel_id,
@@ -473,12 +492,22 @@ export class Client extends EventEmitter {
           editedTimestamp: d.edited_timestamp ? Date.parse(d.edited_timestamp) : undefined,
         });
         break;
-      case "MESSAGE_DELETE":
-        this.emit("messageDelete", { id: d.id, channelId: d.channel_id, guildId: d.guild_id ?? null });
+      }
+      case "MESSAGE_DELETE": {
+        const channel = this.channels.cache.get(d.channel_id);
+        const cached = channel?.isText() ? (channel.messages.get(d.id) ?? null) : null;
+        if (channel?.isText()) channel.messages.delete(d.id);
+        this.emit("messageDelete", { id: d.id, channelId: d.channel_id, guildId: d.guild_id ?? null, message: cached });
         break;
-      case "MESSAGE_DELETE_BULK":
+      }
+      case "MESSAGE_DELETE_BULK": {
+        const channel = this.channels.cache.get(d.channel_id);
+        if (channel?.isText()) {
+          for (const id of d.ids as string[]) channel.messages.delete(id);
+        }
         this.emit("messageDeleteBulk", { ids: d.ids, channelId: d.channel_id, guildId: d.guild_id ?? null });
         break;
+      }
       case "MESSAGE_REACTION_ADD":
         this.emit("messageReactionAdd", {
           userId: d.user_id,
@@ -531,7 +560,17 @@ export class Client extends EventEmitter {
         // _patch() mutates existing in place, so the pre-update scalars have
         // to be captured now or they're unrecoverable by the time the event
         // listener runs.
-        const old = existing ? { name: existing.name, icon: existing.icon, ownerId: existing.ownerId } : null;
+        const old = existing
+          ? {
+              name: existing.name,
+              icon: existing.icon,
+              ownerId: existing.ownerId,
+              verificationLevel: existing.verificationLevel,
+              afkChannelId: existing.afkChannelId,
+              afkTimeout: existing.afkTimeout,
+              mfaLevel: existing.mfaLevel,
+            }
+          : null;
         const guild = existing ? existing._patch(d as Partial<APIGuild>) : new Guild(this, d as APIGuild);
         this.guilds.cache.set(guild.id, guild);
         this.emit("guildUpdate", old, guild);

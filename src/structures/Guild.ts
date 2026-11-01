@@ -41,6 +41,10 @@ export interface APIGuild {
   stickers?: APISticker[];
   voice_states?: APIVoiceState[];
   unavailable?: boolean;
+  verification_level?: number;
+  afk_channel_id?: string | null;
+  afk_timeout?: number;
+  mfa_level?: number;
 }
 
 export { createChannel };
@@ -51,6 +55,10 @@ export class Guild extends Base {
   public ownerId: string;
   public icon: string | null;
   public unavailable: boolean;
+  public verificationLevel: number;
+  public afkChannelId: string | null;
+  public afkTimeout: number;
+  public mfaLevel: number;
 
   public readonly roles: RoleManager;
   public readonly channels: GuildChannelManager;
@@ -72,6 +80,10 @@ export class Guild extends Base {
     this.ownerId = data.owner_id;
     this.icon = data.icon;
     this.unavailable = data.unavailable ?? false;
+    this.verificationLevel = data.verification_level ?? 0;
+    this.afkChannelId = data.afk_channel_id ?? null;
+    this.afkTimeout = data.afk_timeout ?? 0;
+    this.mfaLevel = data.mfa_level ?? 0;
 
     this.roles = new RoleManager(client, this.id);
     this.channels = new GuildChannelManager(client, this.id);
@@ -109,6 +121,10 @@ export class Guild extends Base {
     if (data.name !== undefined) this.name = data.name;
     if (data.icon !== undefined) this.icon = data.icon;
     if (data.owner_id !== undefined) this.ownerId = data.owner_id;
+    if (data.verification_level !== undefined) this.verificationLevel = data.verification_level;
+    if (data.afk_channel_id !== undefined) this.afkChannelId = data.afk_channel_id;
+    if (data.afk_timeout !== undefined) this.afkTimeout = data.afk_timeout;
+    if (data.mfa_level !== undefined) this.mfaLevel = data.mfa_level;
     if (data.roles) {
       this.roles.clear();
       for (const role of data.roles) this.roles.set(role.id, new Role(this.client, this.id, role));
