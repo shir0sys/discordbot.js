@@ -75,9 +75,13 @@ export class VoiceGateway extends EventEmitter {
 
   public connect(): void {
     this.destroyed = false;
-    const host = this.options.endpoint.replace(/:\d+$/, "");
-    const url = `wss://${host}/?v=${VOICE_GATEWAY_VERSION}`;
-    this.debug(`connecting to ${url} (raw endpoint: ${this.options.endpoint})`);
+    // The endpoint from VOICE_SERVER_UPDATE can carry a port that's specific
+    // to the voice server instance this session was actually assigned to
+    // (e.g. ":2053") — stripping it and connecting on the wss default (443)
+    // instead routes to a different instance that doesn't recognize the
+    // session, which Discord reports as 4006 right after IDENTIFY.
+    const url = `wss://${this.options.endpoint}/?v=${VOICE_GATEWAY_VERSION}`;
+    this.debug(`connecting to ${url}`);
     this.socket = new WebSocket(url);
     this.socket.addEventListener("open", () => this.debug("voice socket open"));
     this.socket.addEventListener("message", (event) => this.onMessage(event.data as string));
