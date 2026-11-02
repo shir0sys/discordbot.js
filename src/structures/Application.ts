@@ -1,3 +1,4 @@
+import { ApplicationFlagsBitField } from "../util/ApplicationFlags";
 import type { Client } from "../client/Client";
 
 export interface APIApplication {
@@ -34,7 +35,7 @@ export class Application {
   public botPublic: boolean;
   public botRequireCodeGrant: boolean;
   public ownerId: string | null;
-  public flags: number;
+  public flags: ApplicationFlagsBitField;
   public tags: string[];
   public installParams: { scopes: string[]; permissions: string } | null;
   public customInstallURL: string | null;
@@ -51,7 +52,7 @@ export class Application {
     this.botPublic = data.bot_public;
     this.botRequireCodeGrant = data.bot_require_code_grant;
     this.ownerId = data.owner_id ?? null;
-    this.flags = data.flags ?? 0;
+    this.flags = new ApplicationFlagsBitField(BigInt(data.flags ?? 0));
     this.tags = data.tags ?? [];
     this.installParams = data.install_params ?? null;
     this.customInstallURL = data.custom_install_url ?? null;

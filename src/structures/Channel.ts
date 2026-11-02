@@ -3,6 +3,7 @@ import { Invite, type APIInvite } from "./Invite";
 import { Webhook, type APIWebhook } from "./Webhook";
 import { ChannelType } from "../util/Constants";
 import { PermissionsBitField, computeChannelPermissions, type APIPermissionOverwrite } from "../util/Permissions";
+import { ChannelFlagsBitField } from "../util/ChannelFlags";
 import type { Client } from "../client/Client";
 
 export interface APIChannel {
@@ -20,6 +21,7 @@ export interface APIChannel {
   last_message_id?: string | null;
   permission_overwrites?: APIPermissionOverwrite[];
   recipients?: unknown[];
+  flags?: number;
 }
 
 export class Channel extends Base {
@@ -29,6 +31,7 @@ export class Channel extends Base {
   public parentId: string | null;
   public position: number;
   public permissionOverwrites: APIPermissionOverwrite[];
+  public flags: ChannelFlagsBitField;
 
   constructor(client: Client, data: APIChannel) {
     super(client);
@@ -38,6 +41,7 @@ export class Channel extends Base {
     this.parentId = data.parent_id ?? null;
     this.position = data.position ?? 0;
     this.permissionOverwrites = data.permission_overwrites ?? [];
+    this.flags = new ChannelFlagsBitField(BigInt(data.flags ?? 0));
   }
 
   public isText(): this is import("./TextChannel").TextChannel {

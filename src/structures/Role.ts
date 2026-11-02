@@ -1,4 +1,5 @@
 import { Base } from "./Base";
+import { RoleFlagsBitField } from "../util/RoleFlags";
 import type { Client } from "../client/Client";
 
 export interface APIRole {
@@ -12,6 +13,7 @@ export interface APIRole {
   mentionable?: boolean;
   icon?: string | null;
   unicode_emoji?: string | null;
+  flags?: number;
 }
 
 export class Role extends Base {
@@ -26,6 +28,7 @@ export class Role extends Base {
   public mentionable: boolean;
   public icon: string | null;
   public unicodeEmoji: string | null;
+  public flags: RoleFlagsBitField;
 
   constructor(client: Client, guildId: string, data: APIRole) {
     super(client);
@@ -40,6 +43,7 @@ export class Role extends Base {
     this.mentionable = data.mentionable ?? false;
     this.icon = data.icon ?? null;
     this.unicodeEmoji = data.unicode_emoji ?? null;
+    this.flags = new RoleFlagsBitField(BigInt(data.flags ?? 0));
   }
 
   public toString(): string {

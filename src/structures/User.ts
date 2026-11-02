@@ -1,4 +1,5 @@
 import { Base } from "./Base";
+import { UserFlagsBitField } from "../util/UserFlags";
 import type { Client } from "../client/Client";
 
 export interface APIUser {
@@ -8,6 +9,7 @@ export interface APIUser {
   global_name: string | null;
   avatar: string | null;
   bot?: boolean;
+  public_flags?: number;
 }
 
 export class User extends Base {
@@ -17,6 +19,7 @@ export class User extends Base {
   public globalName: string | null;
   public avatar: string | null;
   public bot: boolean;
+  public flags: UserFlagsBitField;
 
   constructor(client: Client, data: APIUser) {
     super(client);
@@ -26,6 +29,7 @@ export class User extends Base {
     this.globalName = data.global_name;
     this.avatar = data.avatar;
     this.bot = data.bot ?? false;
+    this.flags = new UserFlagsBitField(BigInt(data.public_flags ?? 0));
   }
 
   public _patch(data: Partial<APIUser>): this {
@@ -33,6 +37,7 @@ export class User extends Base {
     if (data.discriminator !== undefined) this.discriminator = data.discriminator;
     if (data.global_name !== undefined) this.globalName = data.global_name;
     if (data.avatar !== undefined) this.avatar = data.avatar;
+    if (data.public_flags !== undefined) this.flags = new UserFlagsBitField(BigInt(data.public_flags));
     return this;
   }
 

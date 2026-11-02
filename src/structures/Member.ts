@@ -1,6 +1,7 @@
 import { Base } from "./Base";
 import { User, type APIUser } from "./User";
 import { PermissionsBitField } from "../util/Permissions";
+import { GuildMemberFlagsBitField } from "../util/GuildMemberFlags";
 import type { Channel } from "./Channel";
 import type { Role } from "./Role";
 import type { Client } from "../client/Client";
@@ -10,6 +11,7 @@ export interface APIMember {
   nick: string | null;
   roles: string[];
   joined_at: string;
+  flags?: number;
 }
 
 export class Member extends Base {
@@ -18,6 +20,7 @@ export class Member extends Base {
   public nick: string | null;
   public roleIds: string[];
   public joinedTimestamp: number;
+  public flags: GuildMemberFlagsBitField;
 
   constructor(client: Client, guildId: string, data: APIMember) {
     super(client);
@@ -26,6 +29,7 @@ export class Member extends Base {
     this.nick = data.nick;
     this.roleIds = data.roles;
     this.joinedTimestamp = Date.parse(data.joined_at);
+    this.flags = new GuildMemberFlagsBitField(BigInt(data.flags ?? 0));
   }
 
   public get displayName(): string {
