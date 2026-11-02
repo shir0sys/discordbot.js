@@ -30,6 +30,7 @@ import { ShardClientUtil } from "../sharding/ShardClientUtil";
 import { GuildBan, type APIBan } from "../structures/GuildBan";
 import { Invite, type APIInvite, type PartialInvite } from "../structures/Invite";
 import { Presence, type APIPresence } from "../structures/Presence";
+import { reactionKey } from "../managers/ReactionManager";
 import { VoiceConnection, VoiceConnectionStatus } from "../voice/VoiceConnection";
 import { Application, type APIApplication } from "../structures/Application";
 import { StickerPack, type APIStickerPack } from "../structures/StickerPack";
@@ -508,7 +509,23 @@ export class Client extends EventEmitter {
         this.emit("messageDeleteBulk", { ids: d.ids, channelId: d.channel_id, guildId: d.guild_id ?? null });
         break;
       }
-      case "MESSAGE_REACTION_ADD":
+      case "MESSAGE_REACTION_ADD": {
+        const channel = this.channels.cache.get(d.channel_id);
+        const cached = channel?.isText() ? channel.messages.get(d.message_id) : undefined;
+        if (cached) {
+          const key = reactionKey({ id: d.emoji?.id ?? null, name: d.emoji?.name ?? null });
+          const existing = cached.reactions.get(key);
+          if (existing) {
+            existing.count++;
+            if (d.user_id === this.user?.id) existing.me = true;
+          } else {
+            cached.reactions._add({
+              count: 1,
+              me: d.user_id === this.user?.id,
+              emoji: { id: d.emoji?.id ?? null, name: d.emoji?.name ?? null, animated: d.emoji?.animated },
+            });
+          }
+        }
         this.emit("messageReactionAdd", {
           userId: d.user_id,
           channelId: d.channel_id,
@@ -517,7 +534,19 @@ export class Client extends EventEmitter {
           emoji: { id: d.emoji?.id ?? null, name: d.emoji?.name ?? null, animated: d.emoji?.animated ?? false },
         });
         break;
-      case "MESSAGE_REACTION_REMOVE":
+      }
+      case "MESSAGE_REACTION_REMOVE": {
+        const channel = this.channels.cache.get(d.channel_id);
+        const cached = channel?.isText() ? channel.messages.get(d.message_id) : undefined;
+        if (cached) {
+          const key = reactionKey({ id: d.emoji?.id ?? null, name: d.emoji?.name ?? null });
+          const existing = cached.reactions.get(key);
+          if (existing) {
+            existing.count = Math.max(0, existing.count - 1);
+            if (d.user_id === this.user?.id) existing.me = false;
+            if (existing.count === 0) cached.reactions.delete(key);
+          }
+        }
         this.emit("messageReactionRemove", {
           userId: d.user_id,
           channelId: d.channel_id,
@@ -526,14 +555,22 @@ export class Client extends EventEmitter {
           emoji: { id: d.emoji?.id ?? null, name: d.emoji?.name ?? null, animated: d.emoji?.animated ?? false },
         });
         break;
-      case "MESSAGE_REACTION_REMOVE_ALL":
+      }
+      case "MESSAGE_REACTION_REMOVE_ALL": {
+        const channel = this.channels.cache.get(d.channel_id);
+        const cached = channel?.isText() ? channel.messages.get(d.message_id) : undefined;
+        cached?.reactions.clear();
         this.emit("messageReactionRemoveAll", {
           channelId: d.channel_id,
           messageId: d.message_id,
           guildId: d.guild_id ?? null,
         });
         break;
-      case "MESSAGE_REACTION_REMOVE_EMOJI":
+      }
+      case "MESSAGE_REACTION_REMOVE_EMOJI": {
+        const channel = this.channels.cache.get(d.channel_id);
+        const cached = channel?.isText() ? channel.messages.get(d.message_id) : undefined;
+        cached?.reactions.delete(reactionKey({ id: d.emoji?.id ?? null, name: d.emoji?.name ?? null }));
         this.emit("messageReactionRemoveEmoji", {
           channelId: d.channel_id,
           messageId: d.message_id,
@@ -541,6 +578,7 @@ export class Client extends EventEmitter {
           emoji: { id: d.emoji?.id ?? null, name: d.emoji?.name ?? null },
         });
         break;
+      }
       case "MESSAGE_POLL_VOTE_ADD":
         this.emit("messagePollVoteAdd", toPollVoteData(d));
         break;
@@ -712,9 +750,12 @@ export class Client extends EventEmitter {
       }
 
       // Presence / typing / users
-      case "PRESENCE_UPDATE":
-        this.emit("presenceUpdate", new Presence(d as APIPresence));
+      case "PRESENCE_UPDATE": {
+        const presence = new Presence(d as APIPresence);
+        if (presence.guildId) this.guilds.cache.get(presence.guildId)?.presences.set(presence.userId, presence);
+        this.emit("presenceUpdate", presence);
         break;
+      }
       case "TYPING_START":
         this.emit("typingStart", {
           channelId: d.channel_id,

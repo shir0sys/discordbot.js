@@ -1,6 +1,7 @@
 import { Base } from "./Base";
-import { Collection } from "../managers/Collection";
 import { RoleManager } from "../managers/RoleManager";
+import { VoiceStateManager } from "../managers/VoiceStateManager";
+import { PresenceManager } from "../managers/PresenceManager";
 import { GuildMemberManager } from "../managers/GuildMemberManager";
 import { GuildChannelManager } from "../managers/GuildChannelManager";
 import { GuildBanManager } from "../managers/GuildBanManager";
@@ -15,6 +16,7 @@ import { createChannel } from "./ChannelFactory";
 import { GuildEmoji, type APIEmoji } from "./Emoji";
 import { Sticker, type APISticker } from "./Sticker";
 import { VoiceState, type APIVoiceState } from "./VoiceState";
+import { Presence, type APIPresence } from "./Presence";
 import {
   GuildOnboarding,
   type APIGuildOnboarding,
@@ -40,6 +42,7 @@ export interface APIGuild {
   emojis?: APIEmoji[];
   stickers?: APISticker[];
   voice_states?: APIVoiceState[];
+  presences?: APIPresence[];
   unavailable?: boolean;
   verification_level?: number;
   afk_channel_id?: string | null;
@@ -71,7 +74,8 @@ export class Guild extends Base {
   public readonly commands: GuildApplicationCommandManager;
   public readonly autoModerationRules: AutoModerationRuleManager;
   public readonly scheduledEvents: GuildScheduledEventManager;
-  public readonly voiceStates = new Collection<string, VoiceState>();
+  public readonly voiceStates: VoiceStateManager;
+  public readonly presences: PresenceManager;
 
   constructor(client: Client, data: APIGuild) {
     super(client);
@@ -96,6 +100,8 @@ export class Guild extends Base {
     this.commands = new GuildApplicationCommandManager(client, this.id);
     this.autoModerationRules = new AutoModerationRuleManager(client, this.id);
     this.scheduledEvents = new GuildScheduledEventManager(client, this.id);
+    this.voiceStates = new VoiceStateManager(client);
+    this.presences = new PresenceManager(client);
 
     for (const role of data.roles) this.roles.set(role.id, new Role(client, this.id, role));
     for (const channel of data.channels ?? []) this.channels.set(channel.id, createChannel(client, channel));
@@ -109,6 +115,9 @@ export class Guild extends Base {
     for (const sticker of data.stickers ?? []) this.stickers.set(sticker.id, new Sticker(client, sticker));
     for (const voiceState of data.voice_states ?? []) {
       this.voiceStates.set(voiceState.user_id, new VoiceState(client, { ...voiceState, guild_id: this.id }));
+    }
+    for (const presence of data.presences ?? []) {
+      this.presences.set(presence.user.id, new Presence({ ...presence, guild_id: this.id }));
     }
   }
 

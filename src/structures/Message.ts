@@ -3,6 +3,9 @@ import { User, type APIUser } from "./User";
 import { AttachmentBuilder } from "../builders/AttachmentBuilder";
 import { ReactionCollector, type CollectedReaction } from "./ReactionCollector";
 import { InteractionCollector, type InteractionCollectorOptions } from "./InteractionCollector";
+import { ReactionManager } from "../managers/ReactionManager";
+import { MessageFlagsBitField } from "../util/MessageFlags";
+import type { APIMessageReaction } from "./MessageReaction";
 import type { JSONEncodable } from "../builders/Components";
 import type { APIEmbed } from "../builders/EmbedBuilder";
 import type { RESTFile } from "../rest/REST";
@@ -22,6 +25,7 @@ export interface APIAttachment {
   height?: number | null;
   width?: number | null;
   ephemeral?: boolean;
+  flags?: number;
 }
 
 export interface APIMessage {
@@ -33,6 +37,8 @@ export interface APIMessage {
   timestamp: string;
   edited_timestamp: string | null;
   attachments: APIAttachment[];
+  reactions?: APIMessageReaction[];
+  flags?: number;
 }
 
 export interface MessageCreateData {
@@ -81,6 +87,8 @@ export class Message extends Base {
   public createdTimestamp: number;
   public editedTimestamp: number | null;
   public attachments: APIAttachment[];
+  public readonly reactions: ReactionManager;
+  public flags: MessageFlagsBitField;
 
   constructor(client: Client, data: APIMessage) {
     super(client);
@@ -92,6 +100,9 @@ export class Message extends Base {
     this.createdTimestamp = Date.parse(data.timestamp);
     this.editedTimestamp = data.edited_timestamp ? Date.parse(data.edited_timestamp) : null;
     this.attachments = data.attachments ?? [];
+    this.reactions = new ReactionManager(client, this.channelId, this.id);
+    for (const reaction of data.reactions ?? []) this.reactions._add(reaction);
+    this.flags = new MessageFlagsBitField(BigInt(data.flags ?? 0));
   }
 
   public async reply(payload: MessagePayload): Promise<Message> {

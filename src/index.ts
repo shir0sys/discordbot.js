@@ -19,13 +19,24 @@ export {
   type APIPermissionOverwrite,
 } from "./util/Permissions";
 export { UserFlagsBitField, UserFlagValues } from "./util/UserFlags";
+export { MessageFlagsBitField, MessageFlagValues } from "./util/MessageFlags";
+export { ApplicationFlagsBitField, ApplicationFlagValues } from "./util/ApplicationFlags";
+export { ChannelFlagsBitField, ChannelFlagValues } from "./util/ChannelFlags";
+export { GuildMemberFlagsBitField, GuildMemberFlagValues } from "./util/GuildMemberFlags";
+export { RoleFlagsBitField, RoleFlagValues } from "./util/RoleFlags";
+export { AttachmentFlagsBitField, AttachmentFlagValues } from "./util/AttachmentFlags";
 export * as Formatters from "./util/Formatters";
 export * as SnowflakeUtil from "./util/SnowflakeUtil";
 export { resolveColor, NamedColors, type ColorResolvable } from "./util/Colors";
 export { HTTPError, RateLimitError, GatewayError } from "./util/Errors";
 export { Collector, type CollectorOptions, type CollectorEndReason } from "./util/Collector";
+export { parseEmoji, resolvePartialEmoji, type ParsedEmoji, type PartialEmoji } from "./util/Emoji";
 
 export { Collection } from "./managers/Collection";
+export { CachedManager } from "./managers/CachedManager";
+export { PresenceManager } from "./managers/PresenceManager";
+export { VoiceStateManager } from "./managers/VoiceStateManager";
+export { ReactionManager, reactionKey } from "./managers/ReactionManager";
 export { GuildManager } from "./managers/GuildManager";
 export { ChannelManager } from "./managers/ChannelManager";
 export { UserManager } from "./managers/UserManager";
@@ -179,7 +190,13 @@ export {
   type VoiceReadyData,
   type VoiceSessionDescription,
 } from "./voice/VoiceGateway";
-export { VoiceUDP, buildRtpPacket, type IPDiscoveryResult } from "./voice/VoiceUDP";
+export {
+  VoiceUDP,
+  buildRtpPacket,
+  decryptRtpPacket,
+  type IPDiscoveryResult,
+  type DecryptedRtpPacket,
+} from "./voice/VoiceUDP";
 export { DaveSession } from "./voice/DaveSession";
 export { AudioPlayer, AudioPlayerStatus } from "./voice/AudioPlayer";
 export { AudioResource } from "./voice/AudioResource";
