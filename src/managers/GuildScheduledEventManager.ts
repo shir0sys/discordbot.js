@@ -1,4 +1,4 @@
-import { Collection } from "./Collection";
+import { CachedManager } from "./CachedManager";
 import { GuildScheduledEvent, type APIGuildScheduledEvent } from "../structures/GuildScheduledEvent";
 import type { User, APIUser } from "../structures/User";
 import type { Client } from "../client/Client";
@@ -14,12 +14,12 @@ export interface GuildScheduledEventCreateData {
   entity_metadata?: { location?: string };
 }
 
-export class GuildScheduledEventManager extends Collection<string, GuildScheduledEvent> {
+export class GuildScheduledEventManager extends CachedManager<string, GuildScheduledEvent> {
   constructor(
-    private readonly client: Client,
+    client: Client,
     private readonly guildId: string,
   ) {
-    super();
+    super(client);
   }
 
   public async fetchAll(withUserCount = false): Promise<GuildScheduledEvent[]> {

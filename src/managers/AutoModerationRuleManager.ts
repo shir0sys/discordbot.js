@@ -1,4 +1,4 @@
-import { Collection } from "./Collection";
+import { CachedManager } from "./CachedManager";
 import { AutoModerationRule, type APIAutoModerationRule } from "../structures/AutoModerationRule";
 import type { Client } from "../client/Client";
 
@@ -13,12 +13,12 @@ export interface AutoModerationRuleCreateData {
   exempt_channels?: string[];
 }
 
-export class AutoModerationRuleManager extends Collection<string, AutoModerationRule> {
+export class AutoModerationRuleManager extends CachedManager<string, AutoModerationRule> {
   constructor(
-    private readonly client: Client,
+    client: Client,
     private readonly guildId: string,
   ) {
-    super();
+    super(client);
   }
 
   public async fetchAll(): Promise<AutoModerationRule[]> {

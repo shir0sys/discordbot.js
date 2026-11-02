@@ -1,14 +1,14 @@
-import { Collection } from "./Collection";
+import { CachedManager } from "./CachedManager";
 import { Sticker, type APISticker } from "../structures/Sticker";
 import type { RESTFile } from "../rest/REST";
 import type { Client } from "../client/Client";
 
-export class GuildStickerManager extends Collection<string, Sticker> {
+export class GuildStickerManager extends CachedManager<string, Sticker> {
   constructor(
-    private readonly client: Client,
+    client: Client,
     private readonly guildId: string,
   ) {
-    super();
+    super(client);
   }
 
   public async create(

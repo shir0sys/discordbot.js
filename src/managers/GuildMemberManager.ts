@@ -1,13 +1,13 @@
-import { Collection } from "./Collection";
+import { CachedManager } from "./CachedManager";
 import { Member, type APIMember } from "../structures/Member";
 import type { Client } from "../client/Client";
 
-export class GuildMemberManager extends Collection<string, Member> {
+export class GuildMemberManager extends CachedManager<string, Member> {
   constructor(
-    private readonly client: Client,
+    client: Client,
     private readonly guildId: string,
   ) {
-    super(null, 5000);
+    super(client, 5000);
   }
 
   public _add(userId: string, data: APIMember): Member {

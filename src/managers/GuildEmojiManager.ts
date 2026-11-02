@@ -1,13 +1,13 @@
-import { Collection } from "./Collection";
+import { CachedManager } from "./CachedManager";
 import { GuildEmoji, type APIEmoji } from "../structures/Emoji";
 import type { Client } from "../client/Client";
 
-export class GuildEmojiManager extends Collection<string, GuildEmoji> {
+export class GuildEmojiManager extends CachedManager<string, GuildEmoji> {
   constructor(
-    private readonly client: Client,
+    client: Client,
     private readonly guildId: string,
   ) {
-    super();
+    super(client);
   }
 
   /** `image` is a base64 data URI (e.g. "data:image/png;base64,...") per Discord's image-upload convention. */

@@ -1,13 +1,13 @@
-import { Collection } from "./Collection";
+import { CachedManager } from "./CachedManager";
 import { Role, type APIRole } from "../structures/Role";
 import type { Client } from "../client/Client";
 
-export class RoleManager extends Collection<string, Role> {
+export class RoleManager extends CachedManager<string, Role> {
   constructor(
-    private readonly client: Client,
+    client: Client,
     private readonly guildId: string,
   ) {
-    super();
+    super(client);
   }
 
   public async create(

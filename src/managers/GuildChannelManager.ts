@@ -1,4 +1,4 @@
-import { Collection } from "./Collection";
+import { CachedManager } from "./CachedManager";
 import { Channel, type APIChannel } from "../structures/Channel";
 import { createChannel } from "../structures/ChannelFactory";
 import type { APIPermissionOverwrite } from "../util/Permissions";
@@ -17,12 +17,12 @@ export interface GuildChannelCreateData {
   permission_overwrites?: APIPermissionOverwrite[];
 }
 
-export class GuildChannelManager extends Collection<string, Channel> {
+export class GuildChannelManager extends CachedManager<string, Channel> {
   constructor(
-    private readonly client: Client,
+    client: Client,
     private readonly guildId: string,
   ) {
-    super();
+    super(client);
   }
 
   public async create(data: GuildChannelCreateData, reason?: string): Promise<Channel> {

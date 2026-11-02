@@ -1,13 +1,13 @@
-import { Collection } from "./Collection";
+import { CachedManager } from "./CachedManager";
 import { ThreadMember, type APIThreadMember } from "../structures/ThreadMember";
 import type { Client } from "../client/Client";
 
-export class ThreadMemberManager extends Collection<string, ThreadMember> {
+export class ThreadMemberManager extends CachedManager<string, ThreadMember> {
   constructor(
-    private readonly client: Client,
+    client: Client,
     private readonly threadId: string,
   ) {
-    super();
+    super(client);
   }
 
   public async fetch(userId: string): Promise<ThreadMember> {

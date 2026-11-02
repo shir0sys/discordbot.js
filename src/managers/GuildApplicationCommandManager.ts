@@ -1,15 +1,15 @@
-import { Collection } from "./Collection";
+import { CachedManager } from "./CachedManager";
 import { ApplicationCommand } from "../structures/ApplicationCommand";
 import type { ApplicationCommandData, CommandInput } from "./ApplicationCommandManager";
 import type { Client } from "../client/Client";
 
 /** The same command registration calls as the global `ApplicationCommandManager`, pre-scoped to one guild and cached under `guild.commands`. */
-export class GuildApplicationCommandManager extends Collection<string, ApplicationCommand> {
+export class GuildApplicationCommandManager extends CachedManager<string, ApplicationCommand> {
   constructor(
-    private readonly client: Client,
+    client: Client,
     private readonly guildId: string,
   ) {
-    super();
+    super(client);
   }
 
   /** Bulk-overwrites every command registered in this guild — named setAll rather than set() to avoid colliding with Map.set()'s single-entry signature. */
