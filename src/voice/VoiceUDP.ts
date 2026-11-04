@@ -155,6 +155,12 @@ export class VoiceUDP extends EventEmitter {
       this.emit("debug", `dropped non-RTPv2 packet (len=${message.length}, byte0=0x${message[0].toString(16)})`);
       return;
     }
+    // Discord also sends RTCP-like control traffic on the same UDP socket
+    // (receiver reports etc.) — same RTP version bits, but a different
+    // payload type than Opus (0x78), so they'd otherwise hit decryptRtpPacket
+    // and fail the auth tag every time since they were never encrypted the
+    // same way. @discordjs/voice's receiver guards on this exact byte too.
+    if ((message[1] & 0x7f) !== 0x78) return;
     if (!this.secretKey) {
       this.emit("debug", "dropped RTP packet received before secret key was set");
       return;
