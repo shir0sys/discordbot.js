@@ -114,7 +114,10 @@ export class VoiceConnection extends EventEmitter {
       // prepare_epoch, or the connection is torn down.
     });
 
-    gateway.on("speaking", ({ ssrc, userId }) => this.ssrcToUserId.set(ssrc, userId));
+    gateway.on("speaking", ({ ssrc, userId }) => {
+      this.ssrcToUserId.set(ssrc, userId);
+      this.emit("debug", `speaking: ssrc=${ssrc} -> userId=${userId}`);
+    });
     gateway.on("clientDisconnect", (userId) => {
       for (const [ssrc, id] of this.ssrcToUserId) {
         if (id === userId) this.ssrcToUserId.delete(ssrc);
@@ -161,6 +164,7 @@ export class VoiceConnection extends EventEmitter {
     this.ssrc = data.ssrc;
     this.udp = new VoiceUDP(data.ssrc, data.ip, data.port);
     this.udp.on("packet", (packet) => this.handleIncomingPacket(packet));
+    this.udp.on("debug", (message) => this.emit("debug", `[udp] ${message}`));
     this.emit("debug", `voice ready (ssrc=${data.ssrc}, ${data.ip}:${data.port}), starting UDP IP discovery`);
     try {
       const discovered = await this.udp.discoverIP();
@@ -186,7 +190,10 @@ export class VoiceConnection extends EventEmitter {
    */
   private handleIncomingPacket(packet: DecryptedRtpPacket): void {
     const userId = this.ssrcToUserId.get(packet.ssrc);
-    if (!userId) return;
+    if (!userId) {
+      this.emit("debug", `dropped audio packet for unknown ssrc=${packet.ssrc}`);
+      return;
+    }
 
     let opusFrame = packet.payload;
     if (this.dave) {

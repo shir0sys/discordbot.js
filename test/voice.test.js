@@ -1,6 +1,6 @@
 const { test } = require("node:test");
 const assert = require("node:assert/strict");
-const { createDecipheriv, randomBytes } = require("node:crypto");
+const { createCipheriv, createDecipheriv, randomBytes } = require("node:crypto");
 const { buildRtpPacket, decryptRtpPacket } = require("../dist/voice/VoiceUDP");
 const { OpusEncoder, PCM_FRAME_BYTES } = require("../dist/voice/OpusEncoder");
 const { DaveSession } = require("../dist/voice/DaveSession");
@@ -102,6 +102,46 @@ test("decryptRtpPacket returns null instead of throwing on garbage input", () =>
   const secretKey = randomBytes(32);
   assert.equal(decryptRtpPacket({ packet: Buffer.alloc(40), secretKey }), null);
   assert.equal(decryptRtpPacket({ packet: Buffer.alloc(4), secretKey }), null);
+});
+
+test("decryptRtpPacket decodes a packet with a one-byte RTP header extension (profile 0xBEDE), as real Discord clients send", () => {
+  const secretKey = randomBytes(32);
+  const opusFrame = randomBytes(40);
+
+  const header = Buffer.alloc(12);
+  header[0] = 0x90; // version 2, extension bit set, no CSRCs
+  header[1] = 0x78;
+  header.writeUInt16BE(42, 2);
+  header.writeUInt32BE(9600, 4);
+  header.writeUInt32BE(777, 8);
+
+  // One 32-bit word of extension data, as Discord's clients actually send.
+  const extension = Buffer.alloc(8);
+  extension.writeUInt16BE(0xbede, 0);
+  extension.writeUInt16BE(1, 2);
+  extension.writeUInt32BE(0, 4);
+
+  const aad = Buffer.concat([header, extension]);
+  const nonceCounter = 3;
+  const nonce = Buffer.alloc(12);
+  nonce.writeUInt32BE(nonceCounter, 0);
+
+  const cipher = createCipheriv("aes-256-gcm", secretKey, nonce);
+  cipher.setAAD(aad);
+  const ciphertext = Buffer.concat([cipher.update(opusFrame), cipher.final()]);
+  const authTag = cipher.getAuthTag();
+
+  const nonceSuffix = Buffer.alloc(4);
+  nonceSuffix.writeUInt32BE(nonceCounter, 0);
+
+  const packet = Buffer.concat([aad, ciphertext, authTag, nonceSuffix]);
+
+  const decoded = decryptRtpPacket({ packet, secretKey });
+  assert.ok(decoded, "a real-shaped extension packet should decode, not fail the auth tag");
+  assert.equal(decoded.ssrc, 777);
+  assert.equal(decoded.sequence, 42);
+  assert.equal(decoded.timestamp, 9600);
+  assert.deepEqual(decoded.payload, opusFrame);
 });
 
 test("OpusEncoder round-trips silence through real libopus (via opusscript)", () => {

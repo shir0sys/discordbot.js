@@ -53,33 +53,49 @@ export function buildRtpPacket(params: {
 }
 
 /**
- * Reverses buildRtpPacket(): same header/ciphertext/auth-tag/nonce-suffix
- * layout, so this only correctly decodes packets using that exact framing.
- * Real Discord clients can prepend a one-byte RTP header extension (profile
- * 0xBEDE) before the Opus payload for things like silence/video signaling —
- * unhandled here, so packets using one fail the auth tag check and come
- * back null rather than being misparsed. Verified only by round-tripping
- * against buildRtpPacket's own output, not against real client traffic.
+ * Reverses buildRtpPacket() for our own output, and also decodes real
+ * Discord client traffic, which routinely sets the RTP header's extension
+ * bit and prepends a one-byte-header extension (profile 0xBEDE) right
+ * after the fixed 12-byte header. The "rtpsize" encryption modes are named
+ * for exactly this: the AEAD's associated data covers the header *plus*
+ * that extension (and any CSRC list, always empty in practice for Discord)
+ * so the extension can travel unencrypted but still authenticated — only
+ * the actual Opus frame after it is ciphertext. Getting this AAD/ciphertext
+ * boundary wrong fails the auth tag silently (returns null) rather than
+ * producing garbage audio, which is what real client packets did before
+ * this accounted for the extension.
  */
 export function decryptRtpPacket(params: { packet: Buffer; secretKey: Uint8Array }): DecryptedRtpPacket | null {
   const { packet, secretKey } = params;
   if (packet.length < 12 + 16 + 4) return null;
 
-  const header = packet.subarray(0, 12);
-  const sequence = header.readUInt16BE(2);
-  const timestamp = header.readUInt32BE(4);
-  const ssrc = header.readUInt32BE(8);
+  const versionAndFlags = packet[0];
+  const hasExtension = (versionAndFlags & 0x10) !== 0;
+  const csrcCount = versionAndFlags & 0x0f;
 
+  const sequence = packet.readUInt16BE(2);
+  const timestamp = packet.readUInt32BE(4);
+  const ssrc = packet.readUInt32BE(8);
+
+  let aadEnd = 12 + csrcCount * 4;
+  if (hasExtension) {
+    if (packet.length < aadEnd + 4) return null;
+    const extensionWords = packet.readUInt16BE(aadEnd + 2);
+    aadEnd += 4 + extensionWords * 4;
+  }
+  if (aadEnd + 16 + 4 > packet.length) return null;
+
+  const aad = packet.subarray(0, aadEnd);
   const nonceCounter = packet.readUInt32BE(packet.length - 4);
   const authTag = packet.subarray(packet.length - 4 - 16, packet.length - 4);
-  const ciphertext = packet.subarray(12, packet.length - 4 - 16);
+  const ciphertext = packet.subarray(aadEnd, packet.length - 4 - 16);
 
   const nonce = Buffer.alloc(12);
   nonce.writeUInt32BE(nonceCounter, 0);
 
   try {
     const decipher = createDecipheriv("aes-256-gcm", secretKey as Uint8Array, nonce);
-    decipher.setAAD(header);
+    decipher.setAAD(aad);
     decipher.setAuthTag(authTag);
     const payload = Buffer.concat([decipher.update(ciphertext), decipher.final()]);
     return { ssrc, sequence, timestamp, payload };
@@ -91,6 +107,7 @@ export function decryptRtpPacket(params: { packet: Buffer; secretKey: Uint8Array
 type VoiceUDPEvents = {
   /** One decrypted Opus frame from another member — still DAVE-encrypted if the call has E2EE active, see VoiceConnection. */
   packet: [DecryptedRtpPacket];
+  debug: [string];
 };
 
 /**
@@ -120,11 +137,24 @@ export class VoiceUDP extends EventEmitter {
 
   /** The IP discovery response (type 0x0002) and any pre-encryption garbage both fail these checks harmlessly; only real RTP audio packets reach decryptRtpPacket. */
   private onPacket(message: Buffer): void {
-    if (message.length < 12 || message[0] !== 0x80) return;
-    if (!this.secretKey) return;
+    if (message.length < 12) return;
+    // Version bits only (top 2 bits of byte 0) — real clients can legitimately
+    // set the padding/extension/CSRC-count bits too, unlike our own buildRtpPacket.
+    if ((message[0] & 0xc0) !== 0x80) {
+      this.emit("debug", `dropped non-RTPv2 packet (len=${message.length}, byte0=0x${message[0].toString(16)})`);
+      return;
+    }
+    if (!this.secretKey) {
+      this.emit("debug", "dropped RTP packet received before secret key was set");
+      return;
+    }
 
     const decoded = decryptRtpPacket({ packet: message, secretKey: this.secretKey });
-    if (decoded) this.emit("packet", decoded);
+    if (decoded) {
+      this.emit("packet", decoded);
+    } else {
+      this.emit("debug", `RTP packet failed to decrypt (len=${message.length}, byte0=0x${message[0].toString(16)})`);
+    }
   }
 
   /** When set, every Opus frame is run through this (DAVE end-to-end encryption) before the usual transport-level RTP/AES-256-GCM framing — the two are independent layers. */
