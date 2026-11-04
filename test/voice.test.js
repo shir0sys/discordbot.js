@@ -105,8 +105,13 @@ test("decryptRtpPacket returns null instead of throwing on garbage input", () =>
 });
 
 test("decryptRtpPacket decodes a packet with a one-byte RTP header extension (profile 0xBEDE), as real Discord clients send", () => {
+  // Confirmed against @discordjs/voice's own receive-side implementation:
+  // the AAD covers the header plus only the 4-byte extension *header*
+  // (profile + length) — the extension's data words are encrypted together
+  // with the Opus frame and get stripped off the decrypted plaintext after.
   const secretKey = randomBytes(32);
   const opusFrame = randomBytes(40);
+  const extensionData = randomBytes(4); // one 32-bit word
 
   const header = Buffer.alloc(12);
   header[0] = 0x90; // version 2, extension bit set, no CSRCs
@@ -115,20 +120,19 @@ test("decryptRtpPacket decodes a packet with a one-byte RTP header extension (pr
   header.writeUInt32BE(9600, 4);
   header.writeUInt32BE(777, 8);
 
-  // One 32-bit word of extension data, as Discord's clients actually send.
-  const extension = Buffer.alloc(8);
-  extension.writeUInt16BE(0xbede, 0);
-  extension.writeUInt16BE(1, 2);
-  extension.writeUInt32BE(0, 4);
+  const extensionHeader = Buffer.alloc(4);
+  extensionHeader.writeUInt16BE(0xbede, 0);
+  extensionHeader.writeUInt16BE(1, 2); // 1 word of extension data follows
 
-  const aad = Buffer.concat([header, extension]);
+  const aad = Buffer.concat([header, extensionHeader]);
+  const plaintext = Buffer.concat([extensionData, opusFrame]);
   const nonceCounter = 3;
   const nonce = Buffer.alloc(12);
   nonce.writeUInt32BE(nonceCounter, 0);
 
   const cipher = createCipheriv("aes-256-gcm", secretKey, nonce);
   cipher.setAAD(aad);
-  const ciphertext = Buffer.concat([cipher.update(opusFrame), cipher.final()]);
+  const ciphertext = Buffer.concat([cipher.update(plaintext), cipher.final()]);
   const authTag = cipher.getAuthTag();
 
   const nonceSuffix = Buffer.alloc(4);

@@ -64,6 +64,13 @@ export function buildRtpPacket(params: {
  * boundary wrong fails the auth tag silently (returns null) rather than
  * producing garbage audio, which is what real client packets did before
  * this accounted for the extension.
+ *
+ * Confirmed against @discordjs/voice's own receive-side implementation
+ * (packages/voice/src/receive/VoiceReceiver.ts): the AAD only covers the
+ * fixed header + CSRC list + the 4-byte extension *header* (profile +
+ * length) — the extension's actual data words are inside the ciphertext,
+ * encrypted together with the Opus frame, and get sliced off the front of
+ * the decrypted plaintext afterward rather than excluded from the AAD.
  */
 export function decryptRtpPacket(params: { packet: Buffer; secretKey: Uint8Array }): DecryptedRtpPacket | null {
   const { packet, secretKey } = params;
@@ -77,11 +84,11 @@ export function decryptRtpPacket(params: { packet: Buffer; secretKey: Uint8Array
   const timestamp = packet.readUInt32BE(4);
   const ssrc = packet.readUInt32BE(8);
 
-  let aadEnd = 12 + csrcCount * 4;
+  const extensionHeaderOffset = 12 + csrcCount * 4;
+  let aadEnd = extensionHeaderOffset;
   if (hasExtension) {
     if (packet.length < aadEnd + 4) return null;
-    const extensionWords = packet.readUInt16BE(aadEnd + 2);
-    aadEnd += 4 + extensionWords * 4;
+    aadEnd += 4;
   }
   if (aadEnd + 16 + 4 > packet.length) return null;
 
@@ -97,7 +104,11 @@ export function decryptRtpPacket(params: { packet: Buffer; secretKey: Uint8Array
     const decipher = createDecipheriv("aes-256-gcm", secretKey as Uint8Array, nonce);
     decipher.setAAD(aad);
     decipher.setAuthTag(authTag);
-    const payload = Buffer.concat([decipher.update(ciphertext), decipher.final()]);
+    let payload = Buffer.concat([decipher.update(ciphertext), decipher.final()]);
+    if (hasExtension) {
+      const extensionWords = packet.readUInt16BE(extensionHeaderOffset + 2);
+      payload = payload.subarray(4 * extensionWords);
+    }
     return { ssrc, sequence, timestamp, payload };
   } catch {
     return null;
